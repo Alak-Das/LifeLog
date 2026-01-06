@@ -1,0 +1,4 @@
+com\lifelog\ehr\provider\PatientResourceProviderTest.class
+com\lifelog\ehr\service\EncounterServiceTest.class
+com\lifelog\ehr\service\ObservationServiceTest.class
+com\lifelog\ehr\service\PatientServiceTest.class
