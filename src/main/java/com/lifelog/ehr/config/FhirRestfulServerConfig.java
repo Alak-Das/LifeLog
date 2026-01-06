@@ -12,10 +12,16 @@ import ca.uhn.fhir.rest.server.RestfulServer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.annotation.Bean;
+import ca.uhn.fhir.rest.server.interceptor.RequestValidatingInterceptor;
+
+import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
+import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
+import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.springframework.context.annotation.Configuration;
 
 import com.lifelog.ehr.security.SmartOnFhirInterceptor;
 
+import com.lifelog.ehr.interceptor.AuditLoggingInterceptor;
 import java.util.List;
 
 @Configuration
@@ -42,9 +48,27 @@ public class FhirRestfulServerConfig {
     @Autowired
     private AppointmentResourceProvider appointmentResourceProvider;
 
+    @Autowired
+    private AuditLoggingInterceptor auditLoggingInterceptor;
+
     @Bean
     public SmartOnFhirInterceptor smartOnFhirInterceptor() {
         return new SmartOnFhirInterceptor();
+    }
+
+    @Bean
+    public RequestValidatingInterceptor requestValidatingInterceptor(FhirContext fhirContext) {
+        RequestValidatingInterceptor interceptor = new RequestValidatingInterceptor();
+
+        // Create a validation support chain
+        DefaultProfileValidationSupport defaultSupport = new DefaultProfileValidationSupport(fhirContext);
+        ValidationSupportChain supportChain = new ValidationSupportChain(defaultSupport);
+
+        // Create the validator
+        FhirInstanceValidator validatorModule = new FhirInstanceValidator(supportChain);
+        interceptor.addValidatorModule(validatorModule);
+
+        return interceptor;
     }
 
     @Bean
@@ -61,6 +85,8 @@ public class FhirRestfulServerConfig {
 
         // Register Interceptors
         server.registerInterceptor(smartOnFhirInterceptor());
+        server.registerInterceptor(requestValidatingInterceptor(fhirContext));
+        server.registerInterceptor(auditLoggingInterceptor);
 
         ServletRegistrationBean<RestfulServer> registration = new ServletRegistrationBean<>(server, "/fhir/*");
         registration.setName("FhirServlet");

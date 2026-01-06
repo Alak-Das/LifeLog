@@ -7,17 +7,21 @@ services:
     environment:
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/lifelog
       - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://keycloak:8080/realms/lifelog
+
     depends_on:
       mongo:
         condition: service_healthy
       redis:
         condition: service_healthy
-      keycloak:
-        condition: service_healthy
+
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O - http://localhost:8080/actuator/health | grep UP || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   mongo:
-    image: mongo:latest
+    image: mongo:7.0
     container_name: lifelog-mongo
     ports:
       - "27017:27017"
@@ -30,7 +34,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:alpine
+    image: redis:7.2-alpine
     container_name: lifelog-redis
     ports:
       - "6379:6379"
@@ -39,21 +43,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:23.0.0
-    container_name: lifelog-idp
-    command: start-dev --import-realm --health-enabled=true
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-    ports:
-      - "8180:8080"
-    healthcheck:
-      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080; echo -e \"GET /health/live HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3; cat <&3 | grep \"HTTP/1.1 200 OK\"" ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
 volumes:
   mongo_data:

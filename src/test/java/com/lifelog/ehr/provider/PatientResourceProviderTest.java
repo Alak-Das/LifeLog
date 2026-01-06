@@ -16,7 +16,6 @@ import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -77,12 +76,15 @@ public class PatientResourceProviderTest {
         // Setup
         String name = "Doe";
         String gender = "male";
-        when(patientService.searchPatients(name, gender)).thenReturn(Collections.emptyList());
+        int offset = 0;
+        int count = 10;
+        when(patientService.searchPatients(name, gender, offset, count)).thenReturn(Collections.emptyList());
 
         // Execute
-        provider.search(new StringParam(name), new TokenParam("http://hl7.org/fhir/administrative-gender", gender));
+        provider.search(new StringParam(name), new TokenParam("http://hl7.org/fhir/administrative-gender", gender),
+                offset, count);
 
         // Verify
-        verify(patientService).searchPatients(name, gender);
+        verify(patientService).searchPatients(name, gender, offset, count);
     }
 }

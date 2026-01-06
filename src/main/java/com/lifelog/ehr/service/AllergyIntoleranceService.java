@@ -43,7 +43,10 @@ public class AllergyIntoleranceService {
         mongoAllergy = repository.save(mongoAllergy);
 
         allergy.setId(mongoAllergy.getId());
-        redisTemplate.opsForValue().set("allergyintolerance:" + mongoAllergy.getId(), json, Duration.ofMinutes(10));
+        String finalJson = ctx.newJsonParser().encodeResourceToString(allergy);
+
+        redisTemplate.opsForValue().set("allergyintolerance:" + mongoAllergy.getId(), finalJson,
+                Duration.ofMinutes(10));
 
         return allergy;
     }
@@ -56,9 +59,12 @@ public class AllergyIntoleranceService {
 
         Optional<MongoAllergyIntolerance> result = repository.findById(id);
         if (result.isPresent()) {
-            String json = result.get().getFhirJson();
-            redisTemplate.opsForValue().set("allergyintolerance:" + id, json, Duration.ofMinutes(10));
-            return ctx.newJsonParser().parseResource(AllergyIntolerance.class, json);
+            AllergyIntolerance ai = ctx.newJsonParser().parseResource(AllergyIntolerance.class,
+                    result.get().getFhirJson());
+            ai.setId(id);
+            String jsonWithId = ctx.newJsonParser().encodeResourceToString(ai);
+            redisTemplate.opsForValue().set("allergyintolerance:" + id, jsonWithId, Duration.ofMinutes(10));
+            return ai;
         }
         return null;
     }
@@ -72,7 +78,12 @@ public class AllergyIntoleranceService {
         }
 
         return results.stream()
-                .map(alg -> ctx.newJsonParser().parseResource(AllergyIntolerance.class, alg.getFhirJson()))
+                .map(alg -> {
+                    AllergyIntolerance ai = ctx.newJsonParser().parseResource(AllergyIntolerance.class,
+                            alg.getFhirJson());
+                    ai.setId(alg.getId());
+                    return ai;
+                })
                 .collect(Collectors.toList());
     }
 }

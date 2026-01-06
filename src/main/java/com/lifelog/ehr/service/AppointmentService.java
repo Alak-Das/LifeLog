@@ -54,7 +54,9 @@ public class AppointmentService {
         mongoAppt = repository.save(mongoAppt);
 
         appointment.setId(mongoAppt.getId());
-        redisTemplate.opsForValue().set("appointment:" + mongoAppt.getId(), json, Duration.ofMinutes(10));
+        String finalJson = ctx.newJsonParser().encodeResourceToString(appointment);
+
+        redisTemplate.opsForValue().set("appointment:" + mongoAppt.getId(), finalJson, Duration.ofMinutes(10));
 
         return appointment;
     }
@@ -67,9 +69,11 @@ public class AppointmentService {
 
         Optional<MongoAppointment> result = repository.findById(id);
         if (result.isPresent()) {
-            String json = result.get().getFhirJson();
-            redisTemplate.opsForValue().set("appointment:" + id, json, Duration.ofMinutes(10));
-            return ctx.newJsonParser().parseResource(Appointment.class, json);
+            Appointment a = ctx.newJsonParser().parseResource(Appointment.class, result.get().getFhirJson());
+            a.setId(id);
+            String jsonWithId = ctx.newJsonParser().encodeResourceToString(a);
+            redisTemplate.opsForValue().set("appointment:" + id, jsonWithId, Duration.ofMinutes(10));
+            return a;
         }
         return null;
     }
@@ -83,7 +87,11 @@ public class AppointmentService {
         }
 
         return results.stream()
-                .map(appt -> ctx.newJsonParser().parseResource(Appointment.class, appt.getFhirJson()))
+                .map(appt -> {
+                    Appointment a = ctx.newJsonParser().parseResource(Appointment.class, appt.getFhirJson());
+                    a.setId(appt.getId());
+                    return a;
+                })
                 .collect(Collectors.toList());
     }
 }

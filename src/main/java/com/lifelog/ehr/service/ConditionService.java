@@ -47,7 +47,9 @@ public class ConditionService {
         mongoCond = repository.save(mongoCond);
 
         condition.setId(mongoCond.getId());
-        redisTemplate.opsForValue().set("condition:" + mongoCond.getId(), json, Duration.ofMinutes(10));
+        String finalJson = ctx.newJsonParser().encodeResourceToString(condition);
+
+        redisTemplate.opsForValue().set("condition:" + mongoCond.getId(), finalJson, Duration.ofMinutes(10));
         return condition;
     }
 
@@ -59,9 +61,11 @@ public class ConditionService {
 
         Optional<MongoCondition> result = repository.findById(id);
         if (result.isPresent()) {
-            String json = result.get().getFhirJson();
-            redisTemplate.opsForValue().set("condition:" + id, json, Duration.ofMinutes(10));
-            return ctx.newJsonParser().parseResource(Condition.class, json);
+            Condition c = ctx.newJsonParser().parseResource(Condition.class, result.get().getFhirJson());
+            c.setId(id);
+            String jsonWithId = ctx.newJsonParser().encodeResourceToString(c);
+            redisTemplate.opsForValue().set("condition:" + id, jsonWithId, Duration.ofMinutes(10));
+            return c;
         }
         return null;
     }
@@ -82,7 +86,11 @@ public class ConditionService {
         }
 
         return results.stream()
-                .map(mc -> ctx.newJsonParser().parseResource(Condition.class, mc.getFhirJson()))
+                .map(mc -> {
+                    Condition c = ctx.newJsonParser().parseResource(Condition.class, mc.getFhirJson());
+                    c.setId(mc.getId());
+                    return c;
+                })
                 .collect(Collectors.toList());
     }
 }

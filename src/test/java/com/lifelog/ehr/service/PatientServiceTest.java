@@ -72,14 +72,22 @@ public class PatientServiceTest {
         // Setup
         String name = "Doe";
         MongoPatient mp = new MongoPatient("123", "{\"resourceType\":\"Patient\",\"id\":\"123\"}");
-        when(repository.findByFamilyRegexIgnoreCaseOrGivenRegexIgnoreCase(eq(name), eq(name)))
-                .thenReturn(List.of(mp));
+        int offset = 0;
+        int count = 10;
+
+        org.springframework.data.domain.Page<MongoPatient> page = new org.springframework.data.domain.PageImpl<>(
+                List.of(mp));
+
+        when(repository.findByFamilyRegexIgnoreCaseOrGivenRegexIgnoreCase(eq(name), eq(name),
+                any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(page);
 
         // Execute
-        List<Patient> results = service.searchPatients(name, null);
+        List<Patient> results = service.searchPatients(name, null, offset, count);
 
         // Verify
         assertEquals(1, results.size());
-        verify(repository).findByFamilyRegexIgnoreCaseOrGivenRegexIgnoreCase(name, name);
+        verify(repository).findByFamilyRegexIgnoreCaseOrGivenRegexIgnoreCase(eq(name), eq(name),
+                any(org.springframework.data.domain.Pageable.class));
     }
 }

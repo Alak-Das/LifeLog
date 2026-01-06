@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import java.util.Optional;
 
 @Service
@@ -50,12 +53,13 @@ public class PatientService {
         }
 
         mongoPatient.setFhirJson(json);
-
         mongoPatient = repository.save(mongoPatient);
 
         // Update ID in the FHIR object and cache it
         patient.setId(mongoPatient.getId());
-        redisTemplate.opsForValue().set("patient:" + mongoPatient.getId(), json, Duration.ofMinutes(10));
+        String finalJson = ctx.newJsonParser().encodeResourceToString(patient);
+
+        redisTemplate.opsForValue().set("patient:" + mongoPatient.getId(), finalJson, Duration.ofMinutes(10));
 
         return patient;
     }
@@ -68,31 +72,33 @@ public class PatientService {
 
         Optional<MongoPatient> result = repository.findById(id);
         if (result.isPresent()) {
-            String json = result.get().getFhirJson();
-            redisTemplate.opsForValue().set("patient:" + id, json, Duration.ofMinutes(10));
-            return ctx.newJsonParser().parseResource(Patient.class, json);
+            Patient p = ctx.newJsonParser().parseResource(Patient.class, result.get().getFhirJson());
+            p.setId(id);
+            String jsonWithId = ctx.newJsonParser().encodeResourceToString(p);
+            redisTemplate.opsForValue().set("patient:" + id, jsonWithId, Duration.ofMinutes(10));
+            return p;
         }
         return null;
     }
 
-    public List<Patient> searchPatients(String name, String gender) {
-        List<MongoPatient> results;
+    public List<Patient> searchPatients(String name, String gender, int offset, int count) {
+        Page<MongoPatient> pageResult;
+        Pageable pageable = PageRequest.of(offset / count, count);
 
         if (name != null) {
-            // Simple logic: If name is provided, search family or given.
-            // If gender is ALSO provided, we should ideally filter, but for MVP standard
-            // compliance:
-            // Let's do a basic name search first. (Real FHIR engines have complex criteria
-            // builders)
-            results = repository.findByFamilyRegexIgnoreCaseOrGivenRegexIgnoreCase(name, name);
+            pageResult = repository.findByFamilyRegexIgnoreCaseOrGivenRegexIgnoreCase(name, name, pageable);
         } else if (gender != null) {
-            results = repository.findByGender(gender);
+            pageResult = repository.findByGender(gender, pageable);
         } else {
-            results = repository.findAll();
+            pageResult = repository.findAll(pageable);
         }
 
-        return results.stream()
-                .map(mp -> ctx.newJsonParser().parseResource(Patient.class, mp.getFhirJson()))
+        return pageResult.stream()
+                .map(mp -> {
+                    Patient p = ctx.newJsonParser().parseResource(Patient.class, mp.getFhirJson());
+                    p.setId(mp.getId());
+                    return p;
+                })
                 .collect(Collectors.toList());
     }
 }

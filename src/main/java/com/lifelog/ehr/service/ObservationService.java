@@ -50,7 +50,9 @@ public class ObservationService {
         mongoObs = repository.save(mongoObs);
 
         observation.setId(mongoObs.getId());
-        redisTemplate.opsForValue().set("observation:" + mongoObs.getId(), json, Duration.ofMinutes(10));
+        String finalJson = ctx.newJsonParser().encodeResourceToString(observation);
+
+        redisTemplate.opsForValue().set("observation:" + mongoObs.getId(), finalJson, Duration.ofMinutes(10));
         return observation;
     }
 
@@ -62,9 +64,11 @@ public class ObservationService {
 
         Optional<MongoObservation> result = repository.findById(id);
         if (result.isPresent()) {
-            String json = result.get().getFhirJson();
-            redisTemplate.opsForValue().set("observation:" + id, json, Duration.ofMinutes(10));
-            return ctx.newJsonParser().parseResource(Observation.class, json);
+            Observation o = ctx.newJsonParser().parseResource(Observation.class, result.get().getFhirJson());
+            o.setId(id);
+            String jsonWithId = ctx.newJsonParser().encodeResourceToString(o);
+            redisTemplate.opsForValue().set("observation:" + id, jsonWithId, Duration.ofMinutes(10));
+            return o;
         }
         return null;
     }
@@ -83,7 +87,11 @@ public class ObservationService {
         }
 
         return results.stream()
-                .map(mp -> ctx.newJsonParser().parseResource(Observation.class, mp.getFhirJson()))
+                .map(mp -> {
+                    Observation o = ctx.newJsonParser().parseResource(Observation.class, mp.getFhirJson());
+                    o.setId(mp.getId());
+                    return o;
+                })
                 .collect(Collectors.toList());
     }
 }

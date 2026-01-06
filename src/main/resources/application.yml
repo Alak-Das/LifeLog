@@ -6,17 +6,24 @@ spring:
     name: LifeLog
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/lifelog}
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://mongo:27017/lifelog}
     redis:
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      host: redis
       port: 6379
   security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:8180/realms/lifelog}
+    user:
+      name: admin
+      password: password
 
-hapi:
   fhir:
     server:
       base-path: /fhir/*
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

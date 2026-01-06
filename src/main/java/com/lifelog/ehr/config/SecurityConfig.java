@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.Customizer;
 
 @Configuration
 @EnableWebSecurity
@@ -14,13 +15,12 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
-                        // Allow public access to SMART discovery and CapabilityStatement
-                        .requestMatchers("/.well-known/**", "/fhir/metadata").permitAll()
+                        // Allow public access to SMART discovery, CapabilityStatement, and Health check
+                        .requestMatchers("/.well-known/**", "/fhir/metadata", "/actuator/health").permitAll()
                         // Require authentication for all other FHIR endpoints
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> {
-                        }));
+                .httpBasic(Customizer.withDefaults())
+                .csrf(csrf -> csrf.disable());
         return http.build();
     }
 }

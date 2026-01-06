@@ -47,7 +47,10 @@ public class MedicationRequestService {
         mongoRequest = repository.save(mongoRequest);
 
         request.setId(mongoRequest.getId());
-        redisTemplate.opsForValue().set("medicationrequest:" + mongoRequest.getId(), json, Duration.ofMinutes(10));
+        String finalJson = ctx.newJsonParser().encodeResourceToString(request);
+
+        redisTemplate.opsForValue().set("medicationrequest:" + mongoRequest.getId(), finalJson,
+                Duration.ofMinutes(10));
 
         return request;
     }
@@ -60,9 +63,12 @@ public class MedicationRequestService {
 
         Optional<MongoMedicationRequest> result = repository.findById(id);
         if (result.isPresent()) {
-            String json = result.get().getFhirJson();
-            redisTemplate.opsForValue().set("medicationrequest:" + id, json, Duration.ofMinutes(10));
-            return ctx.newJsonParser().parseResource(MedicationRequest.class, json);
+            MedicationRequest mr = ctx.newJsonParser().parseResource(MedicationRequest.class,
+                    result.get().getFhirJson());
+            mr.setId(id);
+            String jsonWithId = ctx.newJsonParser().encodeResourceToString(mr);
+            redisTemplate.opsForValue().set("medicationrequest:" + id, jsonWithId, Duration.ofMinutes(10));
+            return mr;
         }
         return null;
     }
@@ -76,7 +82,12 @@ public class MedicationRequestService {
         }
 
         return results.stream()
-                .map(req -> ctx.newJsonParser().parseResource(MedicationRequest.class, req.getFhirJson()))
+                .map(req -> {
+                    MedicationRequest mr = ctx.newJsonParser().parseResource(MedicationRequest.class,
+                            req.getFhirJson());
+                    mr.setId(req.getId());
+                    return mr;
+                })
                 .collect(Collectors.toList());
     }
 }

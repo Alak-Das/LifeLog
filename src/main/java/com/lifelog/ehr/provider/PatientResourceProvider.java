@@ -11,6 +11,8 @@ import org.hl7.fhir.r4.model.Patient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import ca.uhn.fhir.rest.api.server.IBundleProvider;
+import ca.uhn.fhir.rest.server.SimpleBundleProvider;
 import java.util.List;
 
 @Component
@@ -40,12 +42,19 @@ public class PatientResourceProvider implements IResourceProvider {
     }
 
     @Search
-    public List<Patient> search(
+    public IBundleProvider search(
             @OptionalParam(name = Patient.SP_NAME) StringParam name,
-            @OptionalParam(name = Patient.SP_GENDER) TokenParam gender) {
+            @OptionalParam(name = Patient.SP_GENDER) TokenParam gender,
+            @Offset Integer offset,
+            @Count Integer count) {
         String nameVal = (name != null) ? name.getValue() : null;
         String genderVal = (gender != null) ? gender.getValue() : null;
 
-        return patientService.searchPatients(nameVal, genderVal);
+        // Defaults
+        int offsetVal = (offset != null) ? offset : 0;
+        int countVal = (count != null) ? count : 10;
+
+        List<Patient> patients = patientService.searchPatients(nameVal, genderVal, offsetVal, countVal);
+        return new SimpleBundleProvider(patients);
     }
 }

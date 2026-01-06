@@ -44,7 +44,9 @@ public class EncounterService {
         mongoEnc = repository.save(mongoEnc);
 
         encounter.setId(mongoEnc.getId());
-        redisTemplate.opsForValue().set("encounter:" + mongoEnc.getId(), json, Duration.ofMinutes(10));
+        String finalJson = ctx.newJsonParser().encodeResourceToString(encounter);
+
+        redisTemplate.opsForValue().set("encounter:" + mongoEnc.getId(), finalJson, Duration.ofMinutes(10));
         return encounter;
     }
 
@@ -56,9 +58,11 @@ public class EncounterService {
 
         Optional<MongoEncounter> result = repository.findById(id);
         if (result.isPresent()) {
-            String json = result.get().getFhirJson();
-            redisTemplate.opsForValue().set("encounter:" + id, json, Duration.ofMinutes(10));
-            return ctx.newJsonParser().parseResource(Encounter.class, json);
+            Encounter e = ctx.newJsonParser().parseResource(Encounter.class, result.get().getFhirJson());
+            e.setId(id);
+            String jsonWithId = ctx.newJsonParser().encodeResourceToString(e);
+            redisTemplate.opsForValue().set("encounter:" + id, jsonWithId, Duration.ofMinutes(10));
+            return e;
         }
         return null;
     }
@@ -71,7 +75,11 @@ public class EncounterService {
         List<MongoEncounter> results = repository.findBySubjectId(searchSubject);
 
         return results.stream()
-                .map(me -> ctx.newJsonParser().parseResource(Encounter.class, me.getFhirJson()))
+                .map(me -> {
+                    Encounter e = ctx.newJsonParser().parseResource(Encounter.class, me.getFhirJson());
+                    e.setId(me.getId());
+                    return e;
+                })
                 .collect(Collectors.toList());
     }
 }
