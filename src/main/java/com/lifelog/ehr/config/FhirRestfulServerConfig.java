@@ -43,11 +43,6 @@ public class FhirRestfulServerConfig {
     private AppointmentResourceProvider appointmentResourceProvider;
 
     @Bean
-    public FhirContext fhirContext() {
-        return FhirContext.forR4();
-    }
-
-    @Bean
     public SmartOnFhirInterceptor smartOnFhirInterceptor() {
         return new SmartOnFhirInterceptor();
     }

@@ -324,16 +324,32 @@ LifeLog implements **SMART on FHIR** using **OAuth2** and **OpenID Connect**.
 - **Resource Server**: Spring Security validates JWT tokens.
 - **Authorization**: HAPI FHIR Interceptor enforces scopes (e.g., `patient/*.read`).
 
-### Keycloak Setup
-The `docker-compose.yml` includes a Keycloak instance at `http://localhost:8180`.
-- **Admin**: `admin` / `admin`
-- **Realm**: A `lifelog` realm should be created.
-- **Client**: Create an `openid-connect` client (e.g., `postman` or `react-app`) with `Access Type: public`.
+### Keycloak Configuration
+
+The `docker-compose.yml` includes a Keycloak instance (`lifelog-idp`) pre-configured for development.
+
+- **Console URL**: [http://localhost:8180](http://localhost:8180)
+- **Credentials**: `admin` / `admin`
+- **Realm**: `lifelog`
+- **Internal Issuer (for Backend)**: `http://keycloak:8080/realms/lifelog`
+- **External Issuer (for Clients)**: `http://localhost:8180/realms/lifelog`
+
+#### SMART on FHIR Client Setup
+To interact with the API, configure a client in Keycloak:
+1. Create a client with ID `lifelog-app` or `postman`.
+2. Set **Client Authentication** to `Off` (Public Client).
+3. Set **Valid Redirect URIs** (e.g., `https://oauth.pstmn.io/v1/browser-callback` for Postman).
+4. Add scopes: `openid`, `profile`, `patient/*.read`, `patient/*.write`.
 
 ### Endpoints
-- **Discovery**: `GET /.well-known/smart-configuration`
-- **Metadata**: `GET /fhir/metadata` (Public)
-- **Protected Resources**: `GET /fhir/Patient`, etc. (Requires `Authorization: Bearer <jwt>`)
+
+| Endpoint | Accessibility | Description |
+| :--- | :--- | :--- |
+| `GET /.well-known/smart-configuration` | **Public** | SMART Discovery document |
+| `GET /fhir/metadata` | **Public** | FHIR CapabilityStatement |
+| `GET /fhir/*` | **Secure** | All FHIR resources (Requires Bearer Token) |
+
+**Authentication Header**: `Authorization: Bearer <JWT_TOKEN>`
 
 ## ⚠️ Current Limitations
 
