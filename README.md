@@ -17,12 +17,143 @@ This project implements a **HAPI FHIR Facade** architecture, enabling standard F
 
 Unlike the standard HAPI FHIR JPA Server (which requires SQL), **LifeLog** uses a "Plain Server" approach where custom Resource Providers delegate to a MongoDB repository.
 
+### High-Level Components
+
+```mermaid
+graph TD
+    Client((Client))
+    subgraph "Application Core"
+        RestServlet[HAPI FHIR REST Server]
+        subgraph "Providers"
+            P1[PatientProvider]
+            P2[ObservationProvider]
+            P3[ConditionProvider]
+            Pn[...Others]
+        end
+        subgraph "Services"
+            S1[PatientService]
+            S2[ObservationService]
+            Sn[...Generic Services]
+        end
+    end
+    
+    subgraph "Infrastructure"
+        Redis[(Redis Cache)]
+        Mongo[(MongoDB)]
+    end
+
+    Client -->|REST API| RestServlet
+    RestServlet --> P1 & P2 & P3 & Pn
+    P1 --> S1
+    P2 --> S2
+    P3 --> Sn
+    Pn --> Sn
+    
+    S1 & S2 & Sn <--> Redis
+    S1 & S2 & Sn <--> Mongo
+```
+
+### Request Flow
+
 1.  **Request**: `GET /fhir/Patient/123`
 2.  **Provider**: `PatientResourceProvider` intercepts the request.
 3.  **Service**: `PatientService` checks **Redis**.
     -   *Hit*: Returns cached JSON.
     -   *Miss*: Fetches from **MongoDB**, caches result in Redis, and returns.
 4.  **Response**: Standard FHIR JSON.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Provider as Resource Provider
+    participant Service
+    participant Redis as Redis Cache
+    participant Mongo as MongoDB
+
+    Client->>Provider: GET /fhir/{Resource}/{id}
+    Provider->>Service: findById({id})
+    Service->>Redis: get({id})
+    alt Cache Hit
+        Redis-->>Service: JSON Resource
+    else Cache Miss
+        Service->>Mongo: findById({id})
+        Mongo-->>Service: Document
+        Service->>Redis: set({id}, JSON)
+    end
+    Service-->>Provider: FHIR Resource
+    Provider-->>Client: JSON Response
+```
+
+## 📂 Project Structure
+
+```text
+src/main/java/com/lifelog/ehr
+├── config/       # Spring & HAPI FHIR Configuration
+├── model/        # MongoDB Data Models (Custom Wrappers)
+├── provider/     # REST Controllers (FHIR Resource Providers)
+├── repository/   # Spring Data MongoDB Repositories
+└── service/      # Business Logic & Caching Layer
+```
+
+## 💾 Database Design
+
+LifeLog uses a **Hybrid Data Model** in MongoDB to balance strict standard compliance with search performance.
+
+### Schema Strategy
+Instead of fully decomposing FHIR resources into hundreds of tables (SQL style) or complex nested sub-documents, we use a **"Raw + Index"** approach:
+
+1.  **Raw Fidelity (`fhirJson`)**: The entire FHIR Resource is serialized to a string and stored in a `fhirJson` field. This ensures 100% data fidelity, handling complex nesting and polymorphism without schema headaches.
+2.  **Search Indexes**: Key fields required for searching (e.g., `patient_id`, `gender`, `status`) are extracted and promoted to top-level fields in the MongoDB document. These fields are indexed for O(1) or O(log n) lookup speeds.
+
+### Example: Patient Collection (`patients`)
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `_id` | String | The Logical ID of the resource (e.g., "123"). |
+| `fhirJson` | String | The full JSON representation (`{"resourceType":"Patient", ...}`). |
+| `family` | String | **(Indexed)** Last Name for searching. |
+| `given` | String | **(Indexed)** First Name for searching. |
+| `gender` | String | **(Indexed)** Administrative Gender. |
+
+### Example: Observation Collection (`observations`)
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `_id` | String | The Logical ID of the observation. |
+| `fhirJson` | String | Full JSON content. |
+| `subjectId` | String | **(Indexed)** Reference to the Patient (e.g., "Patient/123"). |
+| `code` | String | **(Indexed)** The LOINC/SNOMED code (e.g., "85354-9" for Blood Pressure). |
+
+## 🧩 Low Level Design (LLD)
+
+The application follows a strict layered architecture to separate concerns.
+
+### 1. Resource Providers (Controller Layer)
+*   **Role**: Entry point for HTTP requests. Implements HAPI FHIR interfaces (e.g., `IResourceProvider`).
+*   **Responsibility**:
+    *   Parse incoming parameters.
+    *   Delegate business logic to Services.
+    *   Do **not** contain business logic or DB access code.
+
+### 2. Service Layer (Business Logic)
+*   **Role**: The coordinator.
+*   **Responsibility**:
+    *   **Caching Strategy (Read-Through)**:
+        1.  Check Redis for `Key: {ResourceType}:{ID}`.
+        2.  If **Hit**, return immediately.
+        3.  If **Miss**, query Repository -> store in Redis (TTL 10m) -> return.
+    *   **Write Strategy (Write-Through)**:
+        1.  Convert FHIR Object -> JSON String.
+        2.  Extract Index fields (e.g., extract `Patient.name` -> `MongoPatient.family`).
+        3.  Save to MongoDB.
+        4.  Update Redis cache immediately.
+
+### 3. Repository Layer (Data Access)
+*   **Role**: Abstraction over MongoDB.
+*   **Technology**: Spring Data MongoDB (`MongoRepository`).
+*   **Responsibility**:
+    *   Provide standard CRUD operations.
+    *   Define custom finders for indexed fields (e.g., `findBySubjectId`).
 
 ## 📦 How to Run
 
@@ -175,6 +306,37 @@ POST /fhir/Appointment
   ]
 }
 ```
+
+## ⚙️ Configuration
+
+The application is configured via `application.yml` and supports environment variables for containerized deployments.
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `SPRING_DATA_MONGODB_URI` | `mongodb://localhost:27017/lifelog` | Connection string for MongoDB. |
+| `SPRING_DATA_REDIS_HOST` | `localhost` | Hostname for the Redis server. |
+| `SERVER_PORT` | `8080` | Port the application runs on. |
+
+## ⚠️ Current Limitations
+
+- **Security**: The API is currently **open** (no Auth/OAuth2). **Do not deploy to production** without adding an authentication layer (e.g., Keycloak, Smart-on-FHIR).
+- **Validation**: Validation is primarily structural. Semantic validation (e.g., checking if a SNOMED code exists in a ValueSet) is not yet enforced.
+- **Transactions**: MongoDB transactions are not enabled by default; operations are atomic at the document level.
+
+## 🗺️ Roadmap
+
+- [ ] **Auth**: Implement Smart-on-FHIR (OAuth2 + OpenID Connect).
+- [ ] **UI**: Build a Clinician Dashboard using Next.js/React.
+- [ ] **IoMT**: Integrate with Wearables (Apple Health, Google Fit) for continuous observation tracking.
+- [ ] **Analytics**: Add a population health dashboard using MongoDB Charts.
+
+## 🛠️ Troubleshooting
+
+**Issue**: `Port 8080 already in use`
+- **Fix**: Stop other services or change `SERVER_PORT` in `docker-compose.yml`.
+
+**Issue**: Redis Connection Failure
+- **Fix**: Ensure the Redis container is healthy. If running locally without Docker, ensure Redis is installed and running on port 6379.
 
 ## 🧪 Testing
 
