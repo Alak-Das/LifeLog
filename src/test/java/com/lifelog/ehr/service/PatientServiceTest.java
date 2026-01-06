@@ -11,6 +11,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.mockito.Spy;
+import ca.uhn.fhir.context.FhirContext;
 
 import java.util.List;
 
@@ -29,6 +31,9 @@ public class PatientServiceTest {
 
     @Mock
     private ValueOperations<String, String> valueOperations;
+
+    @Spy
+    private FhirContext ctx = FhirContext.forR4();
 
     @InjectMocks
     private PatientService service;

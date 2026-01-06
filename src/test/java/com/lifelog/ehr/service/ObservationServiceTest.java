@@ -11,6 +11,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.mockito.Spy;
+import ca.uhn.fhir.context.FhirContext;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -28,6 +30,9 @@ public class ObservationServiceTest {
 
     @Mock
     private ValueOperations<String, String> valueOperations;
+
+    @Spy
+    private FhirContext ctx = FhirContext.forR4();
 
     @InjectMocks
     private ObservationService service;

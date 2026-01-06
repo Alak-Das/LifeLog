@@ -14,6 +14,8 @@ import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.lifelog.ehr.security.SmartOnFhirInterceptor;
+
 import java.util.List;
 
 @Configuration
@@ -46,6 +48,11 @@ public class FhirRestfulServerConfig {
     }
 
     @Bean
+    public SmartOnFhirInterceptor smartOnFhirInterceptor() {
+        return new SmartOnFhirInterceptor();
+    }
+
+    @Bean
     public ServletRegistrationBean<RestfulServer> fhirServlet(FhirContext fhirContext) {
         RestfulServer server = new RestfulServer(fhirContext);
         server.setResourceProviders(List.of(
@@ -56,6 +63,9 @@ public class FhirRestfulServerConfig {
                 medicationRequestResourceProvider,
                 allergyIntoleranceResourceProvider,
                 appointmentResourceProvider));
+
+        // Register Interceptors
+        server.registerInterceptor(smartOnFhirInterceptor());
 
         ServletRegistrationBean<RestfulServer> registration = new ServletRegistrationBean<>(server, "/fhir/*");
         registration.setName("FhirServlet");

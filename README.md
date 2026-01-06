@@ -317,15 +317,32 @@ The application is configured via `application.yml` and supports environment var
 | `SPRING_DATA_REDIS_HOST` | `localhost` | Hostname for the Redis server. |
 | `SERVER_PORT` | `8080` | Port the application runs on. |
 
+## 🔐 Security & SMART on FHIR
+
+LifeLog implements **SMART on FHIR** using **OAuth2** and **OpenID Connect**.
+- **Identity Provider**: Keycloak accounts for authentication.
+- **Resource Server**: Spring Security validates JWT tokens.
+- **Authorization**: HAPI FHIR Interceptor enforces scopes (e.g., `patient/*.read`).
+
+### Keycloak Setup
+The `docker-compose.yml` includes a Keycloak instance at `http://localhost:8180`.
+- **Admin**: `admin` / `admin`
+- **Realm**: A `lifelog` realm should be created.
+- **Client**: Create an `openid-connect` client (e.g., `postman` or `react-app`) with `Access Type: public`.
+
+### Endpoints
+- **Discovery**: `GET /.well-known/smart-configuration`
+- **Metadata**: `GET /fhir/metadata` (Public)
+- **Protected Resources**: `GET /fhir/Patient`, etc. (Requires `Authorization: Bearer <jwt>`)
+
 ## ⚠️ Current Limitations
 
-- **Security**: The API is currently **open** (no Auth/OAuth2). **Do not deploy to production** without adding an authentication layer (e.g., Keycloak, Smart-on-FHIR).
 - **Validation**: Validation is primarily structural. Semantic validation (e.g., checking if a SNOMED code exists in a ValueSet) is not yet enforced.
 - **Transactions**: MongoDB transactions are not enabled by default; operations are atomic at the document level.
 
 ## 🗺️ Roadmap
 
-- [ ] **Auth**: Implement Smart-on-FHIR (OAuth2 + OpenID Connect).
+- [x] **Auth**: Implement Smart-on-FHIR (OAuth2 + OpenID Connect).
 - [ ] **UI**: Build a Clinician Dashboard using Next.js/React.
 - [ ] **IoMT**: Integrate with Wearables (Apple Health, Google Fit) for continuous observation tracking.
 - [ ] **Analytics**: Add a population health dashboard using MongoDB Charts.
