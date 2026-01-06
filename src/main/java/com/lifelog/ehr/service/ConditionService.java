@@ -24,7 +24,8 @@ public class ConditionService {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
-    private final FhirContext ctx = FhirContext.forR4();
+    @Autowired
+    private FhirContext ctx;
 
     public Condition createCondition(Condition condition) {
         IParser parser = ctx.newJsonParser();

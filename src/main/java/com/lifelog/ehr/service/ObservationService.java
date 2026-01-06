@@ -24,7 +24,8 @@ public class ObservationService {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
-    private final FhirContext ctx = FhirContext.forR4();
+    @Autowired
+    private FhirContext ctx;
 
     public Observation createObservation(Observation observation) {
         IParser parser = ctx.newJsonParser();

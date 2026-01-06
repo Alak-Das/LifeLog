@@ -66,6 +66,12 @@ Base URL: `http://localhost:8080/fhir`
 | **GET** | `/Condition?subject={id}` | Get Diagnoses for Patient |
 | **POST** | `/Encounter` | Record Visits |
 | **GET** | `/Encounter?subject={id}` | Get Encounters for Patient |
+| **POST** | `/MedicationRequest` | Prescribe Medications |
+| **GET** | `/MedicationRequest?subject={id}` | Get Prescriptions for Patient |
+| **POST** | `/AllergyIntolerance` | Record Allergies |
+| **GET** | `/AllergyIntolerance?patient={id}` | Get Allergies for Patient |
+| **POST** | `/Appointment` | Schedule Appointments |
+| **GET** | `/Appointment?actor={id}` | Get Appointments for Patient |
 
 ### Example Payloads
 
@@ -112,6 +118,61 @@ POST /fhir/Encounter
     "display": "ambulatory"
   },
   "subject": { "reference": "Patient/123" }
+}
+```
+
+**Record Medication Request (Prescription)**
+```json
+POST /fhir/MedicationRequest
+{
+  "resourceType": "MedicationRequest",
+  "status": "active",
+  "intent": "order",
+  "medicationCodeableConcept": {
+    "coding": [{ "system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "1049630", "display": "Amoxicillin 500 MG" }]
+  },
+  "subject": { "reference": "Patient/123" },
+  "requester": { "reference": "Practitioner/555" }
+}
+```
+
+**Record Allergy Intolerance**
+```json
+POST /fhir/AllergyIntolerance
+{
+  "resourceType": "AllergyIntolerance",
+  "clinicalStatus": {
+    "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical", "code": "active" }]
+  },
+  "verificationStatus": {
+    "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-verification", "code": "confirmed" }]
+  },
+  "code": {
+    "coding": [{ "system": "http://snomed.info/sct", "code": "373270004", "display": "Penicillin" }]
+  },
+  "patient": { "reference": "Patient/123" }
+}
+```
+
+**Schedule Appointment**
+```json
+POST /fhir/Appointment
+{
+  "resourceType": "Appointment",
+  "status": "booked",
+  "description": "Follow-up checkup",
+  "start": "2024-03-20T09:00:00Z",
+  "end": "2024-03-20T10:00:00Z",
+  "participant": [
+    {
+      "actor": { "reference": "Patient/123" },
+      "status": "accepted"
+    },
+    {
+      "actor": { "reference": "Practitioner/555" },
+      "status": "accepted"
+    }
+  ]
 }
 ```
 

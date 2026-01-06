@@ -24,7 +24,8 @@ public class EncounterService {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
-    private final FhirContext ctx = FhirContext.forR4();
+    @Autowired
+    private FhirContext ctx;
 
     public Encounter createEncounter(Encounter encounter) {
         IParser parser = ctx.newJsonParser();

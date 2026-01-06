@@ -23,7 +23,8 @@ public class PatientService {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
-    private final FhirContext ctx = FhirContext.forR4();
+    @Autowired
+    private FhirContext ctx;
 
     public Patient createPatient(Patient patient) {
         IParser parser = ctx.newJsonParser();
