@@ -1,5 +1,12 @@
 # LifeLog EHR Backend
 
+![Java](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.1-brightgreen)
+![Redis](https://img.shields.io/badge/Redis-Cache-red)
+![MongoDB](https://img.shields.io/badge/MongoDB-Database-green)
+![Docker](https://img.shields.io/badge/Docker-ready-blue)
+![License](https://img.shields.io/badge/License-MIT-blue)
+
 ## Overview & Domain
 
 **Project Name**: LifeLog EHR Backend
