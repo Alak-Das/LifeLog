@@ -29,27 +29,112 @@
 
 ## Architecture & Design
 
-**Architecture Style**: **Modular Monolith**.
-The application is built as a single deployable Spring Boot artifact but structured with distinct service boundaries (Providers -> Services -> Repositories) to allow for future splitting if necessary.
+## Architecture & Design
 
-**High-Level Components**:
-1.  **FHIR Facade (Providers)**: The entry point (Controller layer); handles HTTP requests, parses FHIR JSON, and maps to internal services.
-2.  **Service Layer**: Implements business logic, validation, ID generation, and orchestration.
-3.  **Data Access Layer (Repositories)**: Interfaces with MongoDB using Spring Data.
-4.  **Caching Layer**: Redis-backed cache for high-frequency reads.
-5.  **Event System**: Asynchronous event handling for Audit Logging and Subscriptions.
+**Architecture Style**: **Modular Monolith (FHIR Facade)**.
+The system is designed as a high-performance facade that strictly adheres to the HL7 FHIR standard while leveraging the flexibility of a document-oriented database. It follows a layered, event-driven architecture to ensure scalability and responsiveness.
 
-**Communication Patterns**:
-*   **Synchronous REST**: Standard FHIR interactions (GET /Patient/{id}).
-*   **Asynchronous**:
-    *   **Audit Logging**: `@Async` execution to prevent blocking main threads.
-    *   **Webhooks**: `@Async` subscription notifications via `RestTemplate`.
+### 🏗️ System Architecture Diagram
 
-**Design Patterns**:
-*   **Layered Architecture**: Controller -> Service -> Repository.
-*   **Facade Pattern**: HAPI FHIR `IResourceProvider` acts as a facade over the domain logic.
-*   **Optimistic Locking**: Uses versioning (`@Version`) to handle concurrent updates.
-*   **Decorator/Interceptor**: Uses Interceptors for Authentication and Audit Logging.
+```mermaid
+graph TD
+    Client[Client Apps / IoMT] -->|HTTPS/REST| App[LifeLog EHR Backend]
+    
+    subgraph App [Spring Boot Application]
+        direction TB
+        Security[Security Filter Chain] -->|Auth Check| Interceptors
+        
+        subgraph Interceptors [HAPI FHIR Interceptors]
+            Valid[Request Validation]
+            AuditInt[Audit Logging Hook]
+        end
+        
+        Interceptors -->|Valid Request| Providers[FHIR Resource Providers]
+        
+        subgraph Domain [Business Logic Layer]
+            Providers -->|DTOMapping| Services[Service Layer]
+            Services -->|Logic & Rules| Repos[About Repositories]
+            Services -.->|@Async| EventBus[Async Task Executor]
+        end
+        
+        EventBus -->|Fire & Forget| AuditAsync[Audit Service]
+        EventBus -->|Notify| SubAsync[Subscription Service]
+    end
+    
+    subgraph Data [Persistence & Caching]
+        Repos <-->|Read/Write| Mongo[(MongoDB)]
+        Repos <-->|Cache Hit/Miss| Redis[(Redis Cache)]
+        AuditAsync -->|Write Log| Mongo
+    end
+    
+    SubAsync -.->|HTTP Webhook| External[External Systems]
+```
+
+### 🧩 Component Details
+
+1.  **Gateway & Security**:
+    *   **Security Filter**: Handles Basic Authentication and protects private endpoints.
+    *   **Interceptors**: The `SmartOnFhirInterceptor` and `RequestValidatingInterceptor` gatekeep requests, ensuring they are authorized and structurally valid (FHIR R4 compliant) before reaching business logic.
+
+2.  **FHIR Facade (Providers)**:
+    *   Acts as the **Controller Layer**. It parses incoming FHIR JSON/XML and maps standard FHIR operations (Create, Read, Search) to internal service calls.
+    *   **Responsibility**: Protocol translation only; no business logic.
+
+3.  **Service Layer (Domain Core)**:
+    *   The heart of the application. It handles:
+        *   **ID Generation**: UUID assignment for new resources.
+        *   **Optimistic Locking**: Version checks to prevent lost updates.
+        *   **Search Logic**: Mapping FHIR search parameters (e.g., `date=gt2024`) to MongoDB Queries.
+        *   **Event Publishing**: Offloading side effects like auditing and webhooks.
+
+4.  **Data Access & Caching**:
+    *   **Write-Through Caching**: Data is written to MongoDB and immediately updated in Redis to ensure subsequent reads are fast and consistent.
+    *   **MongoDB**: Stores resources as "Documents" containing metadata (indexes) + the raw `fhirJson` blob.
+
+5.  **Event System (Async)**:
+    *   Uses Spring's `@Async` and a `ThreadPoolTaskExecutor`.
+    *   **Audit Service**: decoupling the mandatory logging from the critical path latency.
+    *   **Subscription Service**: Evaluating criteria match and dispatching webhooks in the background.
+
+### 🔄 Request Flow (Sequence Diagram)
+
+The following diagram illustrates the lifecycle of a **Create Observation** request, highlighting the separation of synchronous (user-facing) and asynchronous (system) tasks.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Provider as ObservationProvider
+    participant Service as ObservationService
+    participant DB as MongoDB
+    participant Cache as Redis
+    participant Async as AsyncExecutor
+
+    Client->>Provider: POST /Observation (JSON)
+    Provider->>Provider: Validate HTTP/Auth
+    Provider->>Service: createObservation(DTO)
+    Service->>Service: Generate ID & Version
+    Service->>DB: Save(MongoObservation)
+    Service->>Cache: Set("observation:id", JSON)
+    Service->>Async: Fire Events (Audit, Subscription)
+    
+    par Async Tasks
+        Async->>DB: Save(AuditLog)
+        Async->>Client: Webhook Notification (if Subscribed)
+    end
+    
+    Service-->>Provider: Return Created Object
+    Provider-->>Client: 201 Created (Location Header)
+```
+
+### 🧠 Domain Service Responsibilities
+
+| Service | Primary Responsibility | Key Interactions |
+| :--- | :--- | :--- |
+| **PatientService** | Manages Patient Identity & Demographics. | Validates uniqueness; indexed search by Name/Gender. |
+| **ObservationService** | Handles Vitals, Labs, and Clinical results. | Links to `Patient`; Updates `Redis` cache; triggers `SubscriptionService`. |
+| **SubscriptionService** | Manages Webhooks & Event dispatch. | Matches resources against active Subscription criteria (e.g., `category=vital-signs`). |
+| **AuditService** | Records compliance logs. | Asynchronously writes to `audit_events` collection. |
+| **ValidationService** | Enforces Business Rules. | Checks reference integrity (e.g., "Does Patient X exist?"). |
 
 ---
 
@@ -180,38 +265,47 @@ src/main/java/com/al/lifelog/
 
 ## API & Usage
 
-**Base URL**: `/fhir`
+**Base URL**: `http://localhost:8080/fhir`
+**Authentication**: Basic Auth (`admin`/`password`).
+**Response Format**: `application/fhir+json`
 
-**Authentication**:
-*   **Type**: Basic Auth
-*   **Default Credentials**: `admin` / `password`
+### 📚 API Reference & Endpoints
 
-**Global Conventions**:
-*   **Response Format**: `application/fhir+json`
-*   **Dates**: ISO 8601 (YYYY-MM-DDThh:mm:ss+zz:zz)
+| Resource | Method | Path | Query Parameters / Body | Description & Usage |
+| :--- | :--- | :--- | :--- | :--- |
+| **Patient** | `POST` | `/Patient` | JSON Body (Patient resource) | Create a new Patient. Returns `201 Created` with `Location` header. |
+| | `GET` | `/Patient/{id}` | N/A | Read Patient by ID. Returns `200 OK` or `404 Not Found`. |
+| | `PUT` | `/Patient/{id}` | JSON Body | Update existing Patient. Uses optimistic locking via `@Version`. |
+| | `DELETE` | `/Patient/{id}` | N/A | Soft-delete Patient. Checks for active references if enabled. |
+| | `GET` | `/Patient/{id}/_history` | N/A | Retrieve version history of a Patient. |
+| | `GET` | `/Patient` | `_id`, `name` (regex), `gender`<br>`_include=Patient:observation`<br>`_revinclude=Observation:patient` | Search Patients. Supports advanced inclusion/reverse inclusion of Observations. |
+| **Observation** | `POST` | `/Observation` | JSON Body | Record clinical observations (Vitals, Labs). |
+| | `GET` | `/Observation/{id}` | N/A | Read Observation by ID. |
+| | `PUT` | `/Observation/{id}` | JSON Body | Update or correct an Observation. |
+| | `GET` | `/Observation` | `subject` (Patient Ref), `code` (LOINC/SNOMED), `date` (Range)<br>`_include=Observation:patient` | Search with date ranges (e.g., `date=gt2024-01-01`). |
+| **Encounter** | `POST` | `/Encounter` | JSON Body | Create a Visit/Encounter. |
+| | `GET` | `/Encounter` | `subject` (Patient Ref), `date` (Range) | Find Encounters for a patient within a date range. |
+| **Condition** | `POST` | `/Condition` | JSON Body | Record Diagnoses or Problems. |
+| | `GET` | `/Condition` | `subject` (Patient Ref), `code` (SNOMED) | distinct `active` or `resolved` conditions by code. |
+| **MedicationRequest** | `POST` | `/MedicationRequest` | JSON Body | Order medications. |
+| | `GET` | `/MedicationRequest` | `subject` (Patient Ref) | List active medication orders for a patient. |
+| **AllergyIntolerance**| `POST` | `/AllergyIntolerance`| JSON Body | Record allergies (Food, Drug, Enviro). |
+| | `GET` | `/AllergyIntolerance`| `patient` (Patient Ref) | List known allergies. |
+| **Appointment** | `POST` | `/Appointment` | JSON Body | Schedule future appointments. |
+| | `GET` | `/Appointment` | `actor` (Patient/Practitioner Ref) | Find appointments for a specific person. |
+| **DiagnosticReport** | `POST` | `/DiagnosticReport` | JSON Body | Store Lab/Imaging reports. |
+| | `GET` | `/DiagnosticReport` | `subject`, `code` | Retrieve reports by patient and test type. |
+| **Immunization** | `POST` | `/Immunization` | JSON Body | Record vaccinations. |
+| | `GET` | `/Immunization` | `patient`, `vaccine-code` | List vaccination history. |
+| **Organization** | `POST` | `/Organization` | JSON Body | Register Healthcare Orgs/Depts. |
+| | `GET` | `/Organization` | `name` | Find Organizations by name. |
+| **Practitioner** | `POST` | `/Practitioner` | JSON Body | Register Doctors/Nurses. |
+| | `GET` | `/Practitioner` | `name` | Find Practitioners by name. |
+| **Subscription** | `POST` | `/Subscription` | JSON Body (Criteria + Channel) | Register Webhook listeners (e.g., "Notify on new Observation"). |
+| | `DELETE` | `/Subscription/{id}` | N/A | Unsubscribe from notifications. |
+| **System** | `GET` | `/metadata` | N/A | **CapabilityStatement**: Lists all supported resources and interactions. |
+| | `GET` | `/.well-known/smart-configuration`| N/A | SMART on FHIR discovery configuration. |
 
-**Main Endpoints**:
-
-| Method | Path | Description | Status Codes |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/fhir/Patient` | Create a Patient | `201`, `400` |
-| `GET` | `/fhir/Patient/{id}` | Read a Patient | `200`, `404` |
-| `GET` | `/fhir/Observation` | Search Observations | `200` |
-
-**Example Request (Create Patient)**:
-```bash
-curl -X POST http://localhost:8080/fhir/Patient \
-  -u admin:password \
-  -H "Content-Type: application/fhir+json" \
-  -d '{
-    "resourceType": "Patient",
-    "name": [{"family": "Doe", "given": ["John"]}]
-  }'
-```
-
-**Webhooks (Subscriptions)**:
-*   Supports `rest-hook` channel type.
-*   Triggers on resource creation/update matching criteria.
 
 ---
 
