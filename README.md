@@ -431,6 +431,5 @@ newman run tests/postman/LifeLog_Integration_Tests.postman_collection.json -e te
 
 **Roadmap**:
 *   [ ] OAuth2 / SMART on FHIR full compliance.
-*   [x] Advanced Search Parameters (Chained params).
 *   [ ] Terminology Server Integration.
 *   [ ] Bulk Data Export ($export).
