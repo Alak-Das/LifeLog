@@ -52,7 +52,7 @@ graph TD
         subgraph Domain [Business Logic Layer]
             Providers -->|Map DTO| Services[Service Layer]
             Services -->|Logic & Rules| Repos[Repositories]
-            Services -.->|@Async| EventBus[Async Task Executor]
+            Services -.->|Async| EventBus[Async Task Executor]
         end
 
         
