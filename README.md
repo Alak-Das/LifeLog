@@ -281,7 +281,7 @@ src/main/java/com/al/lifelog/
 | **Observation** | `POST` | `/Observation` | JSON Body | Record clinical observations (Vitals, Labs). |
 | | `GET` | `/Observation/{id}` | N/A | Read Observation by ID. |
 | | `PUT` | `/Observation/{id}` | JSON Body | Update or correct an Observation. |
-| | `GET` | `/Observation` | `subject` (Patient Ref), `code` (LOINC/SNOMED), `date` (Range)<br>`_include=Observation:patient` | Search with date ranges (e.g., `date=gt2024-01-01`). |
+| | `GET` | `/Observation` | `subject` (Ref), `subject.name` (Chained), `code`, `date`<br>`_include=Observation:patient` | Search with chained patient name (e.g., `subject.name=John`) or date ranges. |
 | **Encounter** | `POST` | `/Encounter` | JSON Body | Create a Visit/Encounter. |
 | | `GET` | `/Encounter` | `subject` (Patient Ref), `date` (Range) | Find Encounters for a patient within a date range. |
 | **Condition** | `POST` | `/Condition` | JSON Body | Record Diagnoses or Problems. |

@@ -80,14 +80,39 @@ public class ObservationResourceProvider implements IResourceProvider {
             @OptionalParam(name = "_count") ca.uhn.fhir.rest.param.NumberParam count,
             @OptionalParam(name = "_offset") ca.uhn.fhir.rest.param.NumberParam offset) {
 
-        String subjectVal = (subject != null) ? subject.getIdPart() : null;
-        String codeVal = (code != null) ? code.getValue() : null;
+        List<String> subjectIds = null;
 
+        if (subject != null) {
+            String chain = subject.getChain();
+            if ("name".equals(chain) || "patient.name".equals(chain)) {
+                // Chained Search: Find patients by name first
+                String nameVal = subject.getValue();
+                List<org.hl7.fhir.r4.model.Patient> patients = patientService.searchPatients(null, nameVal, null, 0,
+                        100);
+
+                if (patients.isEmpty()) {
+                    // If no patients match the name, no observations can match
+                    return new SimpleBundleProvider(java.util.Collections.emptyList());
+                }
+
+                subjectIds = patients.stream()
+                        .map(p -> p.getIdElement().getIdPart())
+                        .collect(Collectors.toList());
+            } else {
+                // Normal Search: By Subject ID
+                String idPart = subject.getIdPart();
+                if (idPart != null) {
+                    subjectIds = java.util.Collections.singletonList(idPart);
+                }
+            }
+        }
+
+        String codeVal = (code != null) ? code.getValue() : null;
         int countVal = (count != null) ? count.getValue().intValue() : 10;
         int offsetVal = (offset != null) ? offset.getValue().intValue() : 0;
 
         List<Observation> observations = observationService.searchObservations(
-                java.util.Collections.singletonList(subjectVal), codeVal, date,
+                subjectIds, codeVal, date,
                 offsetVal, countVal);
 
         List<IBaseResource> resources = new java.util.ArrayList<>(observations);
