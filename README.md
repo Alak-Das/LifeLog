@@ -308,6 +308,12 @@ newman run tests/postman/LifeLog_Integration_Tests.postman_collection.json \
 
 ---
 
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
 <div align="center">
     <sub>Maintained by the LifeLog Engineering Team.</sub>
 </div>
