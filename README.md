@@ -29,8 +29,6 @@
 
 ## Architecture & Design
 
-## Architecture & Design
-
 **Architecture Style**: **Modular Monolith (FHIR Facade)**.
 The system is designed as a high-performance facade that strictly adheres to the HL7 FHIR standard while leveraging the flexibility of a document-oriented database. It follows a layered, event-driven architecture to ensure scalability and responsiveness.
 
@@ -52,10 +50,11 @@ graph TD
         Interceptors -->|Valid Request| Providers[FHIR Resource Providers]
         
         subgraph Domain [Business Logic Layer]
-            Providers -->|DTOMapping| Services[Service Layer]
-            Services -->|Logic & Rules| Repos[About Repositories]
+            Providers -->|Map DTO| Services[Service Layer]
+            Services -->|Logic & Rules| Repos[Repositories]
             Services -.->|@Async| EventBus[Async Task Executor]
         end
+
         
         EventBus -->|Fire & Forget| AuditAsync[Audit Service]
         EventBus -->|Notify| SubAsync[Subscription Service]
