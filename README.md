@@ -227,7 +227,7 @@ java -jar target/lifelog-ehr-0.0.1-SNAPSHOT.jar
 **Base URL**: `http://localhost:8080/fhir`
 
 > [!TIP]
-> All resources support `_format=json` and `_pretty=true` parameters.
+> All resources support `_format=json`, `_pretty=true`, `_count={n}`, and `_offset={n}` parameters.
 
 ### 1. Patient Scenarios (Role: **Admin**)
 | Method | Endpoint | Params | Description |
@@ -235,38 +235,36 @@ java -jar target/lifelog-ehr-0.0.1-SNAPSHOT.jar
 | `POST` | `/Patient` | N/A | Create a new patient. |
 | `GET` | `/Patient/{id}` | N/A | Read patient details. |
 | `GET` | `/Patient` | `name`, `gender`, `_id` | Search patients. |
+| `GET` | `/Patient` | `_include=Patient:observation` | Search with forward include (include Observations). |
 | `GET` | `/Patient` | `_revinclude=Observation:patient` | Search with reverse include (include Observations). |
 | `PUT` | `/Patient/{id}` | N/A | Update patient record. |
 | `DELETE` | `/Patient/{id}` | N/A | Delete patient record. |
 | `GET` | `/Patient/{id}/_history` | N/A | Retrieve version history of a patient. |
 
 ### 2. Clinical Resources (Role: **Clinical**)
-| Resource | Method | Endpoint | Supported Params |
+| Resource | Methods | Endpoint | Supported Search Params |
 | :--- | :--- | :--- | :--- |
-| **Observation** | `POST` | `/Observation` | `subject`, `subject.name`, `date`, `category` |
-| **Condition** | `POST` | `/Condition` | `subject`, `clinical-status` |
-| **Encounter** | `POST` | `/Encounter` | `subject`, `date` |
-| **AllergyIntolerance** | `POST` | `/AllergyIntolerance` | `patient` |
-| **MedicationRequest** | `POST` | `/MedicationRequest` | `subject`, `status` |
-| **Immunization** | `POST` | `/Immunization` | `patient`, `date` |
-| **DiagnosticReport** | `POST` | `/DiagnosticReport` | `subject`, `status` |
+| **Observation** | `GET`, `POST`, `PUT`, `DELETE`, `History` | `/Observation` | `subject`, `subject.name`, `code`, `date`, `_include=Observation:patient` |
+| **Condition** | `GET`, `POST`, `PUT`, `DELETE`, `History` | `/Condition` | `subject`, `code` |
+| **Encounter** | `GET`, `POST`, `PUT`, `DELETE`, `History` | `/Encounter` | `subject`, `date` |
+| **AllergyIntolerance**| `GET`, `POST` | `/AllergyIntolerance` | `patient` |
+| **MedicationRequest** | `GET`, `POST` | `/MedicationRequest` | `subject` |
+| **Immunization** | `GET`, `POST` | `/Immunization` | `patient`, `vaccine-code` |
+| **DiagnosticReport** | `GET`, `POST` | `/DiagnosticReport` | `subject`, `code` |
 
 ### 3. Administrative Resources (Role: **Admin**)
-| Resource | Method | Endpoint | Description |
+| Resource | Methods | Endpoint | Supported Search Params |
 | :--- | :--- | :--- | :--- |
-| **Practitioner** | `POST` | `/Practitioner` | Register a new healthcare professional. |
-| | `GET` | `/Practitioner` | Search by `name`. |
-| **Organization** | `POST` | `/Organization` | Register a healthcare organization. |
-| | `GET` | `/Organization` | Search by `name`. |
-| **Appointment** | `POST` | `/Appointment` | Schedule an appointment. |
-| | `GET` | `/Appointment` | Search by `actor` (patient/practitioner). |
-| **Subscription** | `POST` | `/Subscription` | Register a webhook subscription. |
+| **Practitioner** | `GET`, `POST` | `/Practitioner` | `name` |
+| **Organization** | `GET`, `POST` | `/Organization` | `name` |
+| **Appointment** | `GET`, `POST` | `/Appointment` | `actor` |
+| **Subscription** | `POST`, `DELETE` | `/Subscription` | N/A (Webhooks) |
 
 ### 4. System & Metadata (Public)
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/metadata` | **CapabilityStatement**: Server capabilities & conformance. |
-| `GET` | `/.well-known/smart-configuration` | **SMART Configuration**: OAuth2 endpoints (future use). |
+| `GET` | `/.well-known/smart-configuration` | **SMART Configuration**: OAuth2 endpoints. |
 | `GET` | `/actuator/health` | **Health Check**: Kubernetes Liveness Probe. |
 | `GET` | `/actuator/prometheus` | **Metrics**: Prometheus scraper endpoint. |
 
