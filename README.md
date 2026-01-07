@@ -394,12 +394,43 @@ newman run tests/postman/LifeLog_Integration_Tests.postman_collection.json -e te
 
 ---
 
+---
+
+## 🛠️ Troubleshooting & Support
+
+**Issue: Port Conflicts**
+`Web server failed to start. Port 8080 was already in use.`
+*   **Fix**: Stop other services running on port 8080 or modify `SERVER_PORT` in `docker-compose.yml`.
+
+**Issue: Database Connection Refused**
+`MongoSocketOpenException: Exception opening socket`
+*   **Fix**: Ensure `mongo` container is healthy. If running outside Docker, check `application.yml` points to `localhost:27017`.
+
+**Issue: Search Returns Empty**
+*   **Fix**: Search parameters are case-sensitive. Check if the resource actually exists using `GET /Resource/{id}`.
+
+---
+
+## ⚡ Performance Tuning
+
+**Java / JVM**:
+*   **Heap Size**: Configure via `JAVA_OPTS` in Docker. Suggested: `-Xms512m -Xmx2048m` for production.
+*   **GC**: G1GC is default in Java 21, optimized for low latency.
+
+**Database (MongoDB)**:
+*   Ensure indexes exist for all query fields. LifeLog creates them on startup, but verify via `mongosh`.
+
+**Caching**:
+*   Adjust `spring.cache.redis.time-to-live` based on data volatility. Current: 10 minutes.
+
+---
+
 ## Governance, Ownership & Future Work
 
 **Owner**: Engineering Team (LifeLog)
 
 **Roadmap**:
 *   [ ] OAuth2 / SMART on FHIR full compliance.
-*   [ ] Advanced Search Parameters (Chained params).
+*   [x] Advanced Search Parameters (Chained params).
 *   [ ] Terminology Server Integration.
 *   [ ] Bulk Data Export ($export).
