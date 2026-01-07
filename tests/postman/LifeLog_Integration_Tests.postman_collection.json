@@ -64,6 +64,21 @@
 		},
 		{
 			"name": "1. Patient Scenarios",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{admin_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{admin_username}}",
+						"type": "string"
+					}
+				]
+			},
 			"item": [
 				{
 					"name": "Create Patient",
@@ -299,6 +314,21 @@
 		},
 		{
 			"name": "2. Observation Scenarios",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{clinical_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{clinical_username}}",
+						"type": "string"
+					}
+				]
+			},
 			"item": [
 				{
 					"name": "Create Observation",
@@ -393,11 +423,116 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Search Observation by Chained Patient Name",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Returns a Searchset Bundle\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.resourceType).to.equal(\"Bundle\");",
+									"    pm.expect(jsonData.type).to.equal(\"searchset\");",
+									"    pm.expect(jsonData.total).to.be.above(0);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/fhir/Observation?subject.name=Doe",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Observation"
+							],
+							"query": [
+								{
+									"key": "subject.name",
+									"value": "Doe"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Observation by Date Range",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/fhir/Observation?date=gt2020-01-01",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Observation"
+							],
+							"query": [
+								{
+									"key": "date",
+									"value": "gt2020-01-01"
+								}
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
 		{
 			"name": "2b. Condition & Encounter Scenarios",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{clinical_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{clinical_username}}",
+						"type": "string"
+					}
+				]
+			},
 			"item": [
 				{
 					"name": "Create Encounter",
@@ -507,6 +642,21 @@
 		},
 		{
 			"name": "2c. Medication & Allergy Scenarios",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{clinical_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{clinical_username}}",
+						"type": "string"
+					}
+				]
+			},
 			"item": [
 				{
 					"name": "Create MedicationRequest",
@@ -616,6 +766,21 @@
 		},
 		{
 			"name": "2d. Diagnostic & Immunization Scenarios",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{clinical_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{clinical_username}}",
+						"type": "string"
+					}
+				]
+			},
 			"item": [
 				{
 					"name": "Create DiagnosticReport",
@@ -725,6 +890,21 @@
 		},
 		{
 			"name": "2e. Administrative Scenarios",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{admin_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{admin_username}}",
+						"type": "string"
+					}
+				]
+			},
 			"item": [
 				{
 					"name": "Create Organization",
@@ -834,6 +1014,21 @@
 		},
 		{
 			"name": "2f. Scheduling Scenarios",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{admin_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{admin_username}}",
+						"type": "string"
+					}
+				]
+			},
 			"item": [
 				{
 					"name": "Create Appointment",
@@ -891,6 +1086,21 @@
 		},
 		{
 			"name": "2g. System Scenarios",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{admin_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{admin_username}}",
+						"type": "string"
+					}
+				]
+			},
 			"item": [
 				{
 					"name": "Create Subscription",
@@ -948,6 +1158,21 @@
 		},
 		{
 			"name": "3. Advanced Scenarios",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{admin_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{admin_username}}",
+						"type": "string"
+					}
+				]
+			},
 			"item": [
 				{
 					"name": "Search Patient with _revinclude (Observations)",
@@ -1119,12 +1344,84 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "5. Cleanup",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{admin_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{admin_username}}",
+						"type": "string"
+					}
+				]
+			},
+			"item": [
+				{
+					"name": "Delete Patient",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 or 204\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient/{{patient_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient",
+								"{{patient_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [
 		{
 			"key": "base_url",
 			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "admin_username",
+			"value": "admin",
+			"type": "string"
+		},
+		{
+			"key": "admin_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "clinical_username",
+			"value": "clinician",
+			"type": "string"
+		},
+		{
+			"key": "clinical_password",
+			"value": "password",
 			"type": "string"
 		},
 		{

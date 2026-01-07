@@ -63,6 +63,12 @@ Unlike traditional SQL-based EHRs, LifeLog leverages **MongoDB** to natively sto
 ### 🛡️ Security & Compliance
 *   **Audit Trails**: Asynchronous, immutable logging of every data access (`AuditEvent`).
 *   **Optimistic Locking**: Prevents "lost updates" using standard FHIR versioning (`Weak ETag`).
+*   **Authentication**: Basic Auth (**RBAC Enabled**)
+
+| Role | Username | Password | Access |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `admin` | `password` | Administrative Resources (`Patient`, `Practitioner`, `Organization`, `Appointment`) |
+| **Clinical** | `clinician` | `password` | Clinical Resources (`Observation`, `Condition`, `Encounter`, etc.) |
 *   **Input Sanitization**: Rejects malformed or unrecognized data structures.
 
 ### 🚀 Technical
@@ -250,6 +256,10 @@ Key environment variables in `docker-compose.yml`:
 | `SPRING_REDIS_HOST` | Redis Host | `redis` |
 | `SERVER_PORT` | App Port | `8080` |
 | `LOGGING_LEVEL_ROOT` | Global Log Level | `INFO` |
+| `SPRING_SECURITY_ADMIN_USERNAME` | Admin Username | `admin` |
+| `SPRING_SECURITY_ADMIN_PASSWORD` | Admin Password | `password` |
+| `SPRING_SECURITY_CLINICAL_USERNAME` | Clinical Username | `clinician` |
+| `SPRING_SECURITY_CLINICAL_PASSWORD` | Clinical Password | `password` |
 
 ### Observability
 *   **Metrics**: Prometheus scraper available at `/actuator/prometheus`.
@@ -291,8 +301,16 @@ mvn test
 
 # Integration Tests (Requires running server)
 # Uses Newman (Postman CLI)
+# Integration Tests (Requires running server)
+# Uses Newman (Postman CLI)
 newman run tests/postman/LifeLog_Integration_Tests.postman_collection.json \
   -e tests/postman/LifeLog_Local.postman_environment.json
+
+### Security Verification
+Verify Role-Based Access Control (RBAC) rules:
+```powershell
+./verify_rbac.ps1
+```
 ```
 
 ---
@@ -301,8 +319,9 @@ newman run tests/postman/LifeLog_Integration_Tests.postman_collection.json \
 
 - [x] **Core FHIR Resources** (Patient, Obs, Condition, etc.)
 - [x] **Advanced Search** (Chained Parameters)
+- [x] **Role-Based Access Control (RBAC)**
 - [x] **Docker Support**
-- [ ] **OAuth2 / SMART on FHIR**
+- [ ] **OAuth2 / SMART on FHIR Compliance**
 - [ ] **Terminology Services** (Validation against LOINC/SNOMED)
 - [ ] **Bulk Export ($export)**
 

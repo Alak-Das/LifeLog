@@ -43,6 +43,7 @@ public class SmartOnFhirInterceptor extends AuthorizationInterceptor {
             return builder
                     .allow().read().allResources().withAnyId().andThen()
                     .allow().write().allResources().withAnyId().andThen()
+                    .allow().delete().allResources().withAnyId().andThen()
                     .allow().metadata().build();
         }
 

@@ -15,8 +15,11 @@ spring:
       host: redis
       port: 6379
   security:
-    user:
-      name: admin
+    admin:
+      username: admin
+      password: password
+    clinical:
+      username: clinician
       password: password
 
   fhir:
