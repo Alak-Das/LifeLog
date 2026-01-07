@@ -1,7 +1,7 @@
 package com.lifelog.ehr.interceptor;
 
 import com.lifelog.ehr.model.AuditLog;
-import com.lifelog.ehr.repository.AuditLogRepository;
+
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import jakarta.servlet.http.HttpServletRequest;
