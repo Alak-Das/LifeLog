@@ -1,0 +1,1179 @@
+{
+	"info": {
+		"_postman_id": "4a1b2c3d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+		"name": "LifeLog FHIR EHR Integration Tests",
+		"description": "Comprehensive integration tests for LifeLog EHR Backend, covering core clinical resources, advanced search, validation, history, and professional observability.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "basic",
+		"basic": [
+			{
+				"key": "password",
+				"value": "{{password}}",
+				"type": "string"
+			},
+			{
+				"key": "username",
+				"value": "{{username}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "0. Discovery & Metadata",
+			"item": [
+				{
+					"name": "SMART Configuration",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/.well-known/smart-configuration",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								".well-known",
+								"smart-configuration"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Capability Statement",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/fhir/metadata",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"metadata"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "1. Patient Scenarios",
+			"item": [
+				{
+					"name": "Create Patient",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"Patient\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        var pid = parts[idIndex];",
+									"        pm.collectionVariables.set(\"patient_id\", pid);",
+									"        console.log(\"Captured Patient ID: \" + pid);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Patient\",\n  \"active\": true,\n  \"name\": [\n    {\n      \"use\": \"official\",\n      \"family\": \"Doe\",\n      \"given\": [\n        \"John\",\n        \"Quincy\"\n      ]\n    }\n  ],\n  \"gender\": \"male\",\n  \"birthDate\": \"1985-01-01\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Read Patient",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Resource is Patient\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.resourceType).to.equal(\"Patient\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient/{{patient_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient",
+								"{{patient_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Patient (Add Address)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 or 204\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Patient\",\n  \"id\": \"{{patient_id}}\",\n  \"active\": true,\n  \"name\": [\n    {\n      \"use\": \"official\",\n      \"family\": \"Doe\",\n      \"given\": [\n        \"John\"\n      ]\n    }\n  ],\n  \"gender\": \"male\",\n  \"address\": [\n    {\n      \"line\": [\"123 Health St\"],\n      \"city\": \"Boston\",\n      \"state\": \"MA\"\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient/{{patient_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient",
+								"{{patient_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Patient History",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Returns a History Bundle\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.resourceType).to.equal(\"Bundle\");",
+									"    pm.expect(jsonData.type).to.equal(\"history\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient/{{patient_id}}/_history",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient",
+								"{{patient_id}}",
+								"_history"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Patient by Name",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Returns a Searchset Bundle\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.resourceType).to.equal(\"Bundle\");",
+									"    pm.expect(jsonData.type).to.equal(\"searchset\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient?name=Doe",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient"
+							],
+							"query": [
+								{
+									"key": "name",
+									"value": "Doe"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Observation Scenarios",
+			"item": [
+				{
+					"name": "Create Observation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"Observation\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"observation_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Observation\",\n  \"status\": \"final\",\n  \"code\": {\n    \"coding\": [\n      {\n        \"system\": \"http://loinc.org\",\n        \"code\": \"85354-9\",\n        \"display\": \"Blood pressure\"\n      }\n    ]\n  },\n  \"subject\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  },\n  \"effectiveDateTime\": \"2024-05-01T10:00:00Z\",\n  \"valueQuantity\": {\n    \"value\": 120,\n    \"unit\": \"mmHg\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Observation",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Observation"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Observation by Subject",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/fhir/Observation?subject=Patient/{{patient_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Observation"
+							],
+							"query": [
+								{
+									"key": "subject",
+									"value": "Patient/{{patient_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2b. Condition & Encounter Scenarios",
+			"item": [
+				{
+					"name": "Create Encounter",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"Encounter\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"encounter_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Encounter\",\n  \"status\": \"finished\",\n  \"class\": {\n    \"system\": \"http://terminology.hl7.org/CodeSystem/v3-ActCode\",\n    \"code\": \"AMB\"\n  },\n  \"subject\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Encounter",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Encounter"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Condition",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"Condition\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"condition_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Condition\",\n  \"subject\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  },\n  \"code\": {\n    \"coding\": [\n      {\n        \"system\": \"http://snomed.info/sct\",\n        \"code\": \"44054006\",\n        \"display\": \"Diabetes\"\n      }\n    ]\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Condition",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Condition"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2c. Medication & Allergy Scenarios",
+			"item": [
+				{
+					"name": "Create MedicationRequest",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"MedicationRequest\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"medrequest_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"MedicationRequest\",\n  \"status\": \"active\",\n  \"intent\": \"order\",\n  \"subject\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  },\n  \"medicationCodeableConcept\": {\n    \"coding\": [\n      {\n        \"system\": \"http://www.nlm.nih.gov/research/umls/rxnorm\",\n        \"code\": \"206765\",\n        \"display\": \"Metformin\"\n      }\n    ]\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/MedicationRequest",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"MedicationRequest"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create AllergyIntolerance",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"AllergyIntolerance\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"allergy_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"AllergyIntolerance\",\n  \"patient\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  },\n  \"code\": {\n    \"coding\": [\n      {\n        \"system\": \"http://snomed.info/sct\",\n        \"code\": \"300916003\",\n        \"display\": \"Latex allergy\"\n      }\n    ]\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/AllergyIntolerance",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"AllergyIntolerance"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2d. Diagnostic & Immunization Scenarios",
+			"item": [
+				{
+					"name": "Create DiagnosticReport",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"DiagnosticReport\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"diagnostic_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"DiagnosticReport\",\n  \"status\": \"final\",\n  \"code\": {\n    \"coding\": [\n      {\n        \"system\": \"http://loinc.org\",\n        \"code\": \"11502-2\",\n        \"display\": \"Laboratory report\"\n      }\n    ]\n  },\n  \"subject\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/DiagnosticReport",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"DiagnosticReport"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Immunization",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"Immunization\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"immunization_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Immunization\",\n  \"status\": \"completed\",\n  \"vaccineCode\": {\n    \"coding\": [\n      {\n        \"system\": \"http://hl7.org/fhir/sid/cvx\",\n        \"code\": \"207\",\n        \"display\": \"SARS-COV-2 (COVID-19) vaccine\"\n      }\n    ]\n  },\n  \"patient\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  },\n  \"occurrenceDateTime\": \"2024-01-15\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Immunization",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Immunization"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2e. Administrative Scenarios",
+			"item": [
+				{
+					"name": "Create Organization",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"Organization\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"organization_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Organization\",\n  \"name\": \"LifeLog Health Center\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Organization",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Organization"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Practitioner",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"Practitioner\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"practitioner_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Practitioner\",\n  \"name\": [\n    {\n      \"family\": \"Smith\",\n      \"given\": [\"Alice\"]\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Practitioner",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Practitioner"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2f. Scheduling Scenarios",
+			"item": [
+				{
+					"name": "Create Appointment",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"Appointment\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"appointment_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Appointment\",\n  \"status\": \"booked\",\n  \"participant\": [\n    {\n      \"actor\": {\n        \"reference\": \"Patient/{{patient_id}}\"\n      },\n      \"status\": \"accepted\"\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Appointment",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Appointment"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2g. System Scenarios",
+			"item": [
+				{
+					"name": "Create Subscription",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var locationHeader = pm.response.headers.get(\"Location\");",
+									"if (locationHeader) {",
+									"    var parts = locationHeader.split(\"/\");",
+									"    var idIndex = parts.indexOf(\"Subscription\") + 1;",
+									"    if (idIndex > 0 && idIndex < parts.length) {",
+									"        pm.collectionVariables.set(\"subscription_id\", parts[idIndex]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Subscription\",\n  \"status\": \"requested\",\n  \"reason\": \"Monitor vital signs\",\n  \"criteria\": \"Observation?category=vital-signs\",\n  \"channel\": {\n    \"type\": \"rest-hook\",\n    \"endpoint\": \"http://example.com/webhook\",\n    \"payload\": \"application/fhir+json\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Subscription",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Subscription"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Advanced Scenarios",
+			"item": [
+				{
+					"name": "Search Patient with _revinclude (Observations)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Bundle contains both Patient and Observation\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    var hasPatient = jsonData.entry.some(e => e.resource.resourceType === 'Patient');",
+									"    var hasObservation = jsonData.entry.some(e => e.resource.resourceType === 'Observation');",
+									"    pm.expect(hasPatient).to.be.true;",
+									"    pm.expect(hasObservation).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient?_id={{patient_id}}&_revinclude=Observation:patient",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient"
+							],
+							"query": [
+								{
+									"key": "_id",
+									"value": "{{patient_id}}"
+								},
+								{
+									"key": "_revinclude",
+									"value": "Observation:patient"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Validation Failure (Invalid Resource)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 422 or 400\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([400, 422]);",
+									"});",
+									"pm.test(\"Returns OperationOutcome\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.resourceType).to.equal(\"OperationOutcome\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Patient\",\n  \"active\": \"not-a-boolean\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4. Observability & Performance",
+			"item": [
+				{
+					"name": "Prometheus Metrics",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Contains fhir_patient_total metric\", function () {",
+									"    pm.expect(pm.response.text()).to.include(\"fhir_patient_total\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/actuator/prometheus",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"actuator",
+								"prometheus"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is UP\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.equal(\"UP\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/actuator/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"actuator",
+								"health"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "patient_id",
+			"value": ""
+		},
+		{
+			"key": "observation_id",
+			"value": ""
+		},
+		{
+			"key": "encounter_id",
+			"value": ""
+		},
+		{
+			"key": "condition_id",
+			"value": ""
+		},
+		{
+			"key": "medrequest_id",
+			"value": ""
+		},
+		{
+			"key": "allergy_id",
+			"value": ""
+		},
+		{
+			"key": "diagnostic_id",
+			"value": ""
+		},
+		{
+			"key": "immunization_id",
+			"value": ""
+		},
+		{
+			"key": "organization_id",
+			"value": ""
+		},
+		{
+			"key": "practitioner_id",
+			"value": ""
+		},
+		{
+			"key": "appointment_id",
+			"value": ""
+		},
+		{
+			"key": "subscription_id",
+			"value": ""
+		}
+	]
+}

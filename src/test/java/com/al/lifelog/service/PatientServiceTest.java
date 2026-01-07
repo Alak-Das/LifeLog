@@ -1,0 +1,136 @@
+package com.al.lifelog.service;
+
+import com.al.lifelog.model.MongoPatient;
+import com.al.lifelog.repository.PatientRepository;
+import org.hl7.fhir.r4.model.Patient;
+import org.hl7.fhir.r4.model.Enumerations.AdministrativeGender;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.mockito.Spy;
+import ca.uhn.fhir.context.FhirContext;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+public class PatientServiceTest {
+
+    @Mock
+    private PatientRepository repository;
+
+    @Mock
+    private StringRedisTemplate redisTemplate;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+
+    @Mock
+    private HistoryService historyService;
+
+    @Spy
+    private FhirContext ctx = FhirContext.forR4();
+
+    @InjectMocks
+    private PatientService service;
+
+    @Test
+    public void testCreatePatient_ShouldIndexFields() {
+        // Setup
+        Patient patient = new Patient();
+        patient.setId("123");
+        patient.addName().setFamily("Doe").addGiven("John");
+        patient.setGender(AdministrativeGender.MALE);
+
+        MongoPatient savedMongoPatient = new MongoPatient();
+        savedMongoPatient.setId("123");
+        savedMongoPatient.setFhirJson("{\"resourceType\":\"Patient\",\"id\":\"123\"}");
+
+        when(repository.save(any(MongoPatient.class))).thenAnswer(invocation -> {
+            MongoPatient mp = invocation.getArgument(0);
+            assertEquals("Doe", mp.getFamily()); // Verify Indexing
+            assertEquals("John", mp.getGiven());
+            assertEquals("male", mp.getGender());
+            mp.setId("123");
+            return mp;
+        });
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        // Execute
+        Patient result = service.createPatient(patient);
+
+        // Verify
+        assertEquals("123", result.getIdElement().getIdPart());
+        assertEquals("1", result.getMeta().getVersionId()); // New check
+        verify(repository).save(any(MongoPatient.class));
+    }
+
+    @Test
+    public void testUpdatePatient_ShouldUpdateAndReturnPatient() {
+        // Setup
+        String id = "123";
+        Patient patient = new Patient();
+        patient.setId(id);
+        patient.addName().setFamily("Smith").addGiven("Jane");
+
+        when(repository.findById(id)).thenReturn(java.util.Optional.empty()); // Simulate upsert or existing check
+
+        when(repository.save(any(MongoPatient.class))).thenAnswer(invocation -> {
+            MongoPatient mp = invocation.getArgument(0);
+            assertEquals("Smith", mp.getFamily());
+            return mp;
+        });
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        // Execute
+        Patient result = service.updatePatient(id, patient);
+
+        // Verify
+        assertEquals(id, result.getIdElement().getIdPart());
+        verify(repository).save(any(MongoPatient.class));
+    }
+
+    @Test
+    public void testDeletePatient_ShouldCallDelete() {
+        // Setup
+        String id = "123";
+        when(repository.findById(id)).thenReturn(java.util.Optional.of(new MongoPatient()));
+
+        // Execute
+        service.deletePatient(id);
+
+        // Verify
+        verify(repository).deleteById(id);
+        verify(redisTemplate).delete("patient:" + id);
+    }
+
+    @Mock
+    private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+
+    @Test
+    public void testSearchPatient_ByName_ShouldCallMongoTemplate() {
+        // Setup
+        String name = "Doe";
+        MongoPatient mp = new MongoPatient("123", "{\"resourceType\":\"Patient\",\"id\":\"123\"}");
+        int offset = 0;
+        int count = 10;
+
+        when(mongoTemplate.find(any(org.springframework.data.mongodb.core.query.Query.class), eq(MongoPatient.class)))
+                .thenReturn(List.of(mp));
+
+        // Execute
+        List<Patient> results = service.searchPatients(null, name, null, offset, count);
+
+        // Verify
+        assertEquals(1, results.size());
+        verify(mongoTemplate).find(any(org.springframework.data.mongodb.core.query.Query.class),
+                eq(MongoPatient.class));
+    }
+}
