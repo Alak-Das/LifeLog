@@ -1,45 +1,87 @@
+<div align="center">
+
 # LifeLog EHR Backend
+### High-Performance Clinical Data Repository (CDR)
 
-![Java](https://img.shields.io/badge/Java-21-orange)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.1-brightgreen)
-![Redis](https://img.shields.io/badge/Redis-Cache-red)
-![MongoDB](https://img.shields.io/badge/MongoDB-Database-green)
-![Docker](https://img.shields.io/badge/Docker-ready-blue)
-![License](https://img.shields.io/badge/License-MIT-blue)
+[![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.1-brightgreen)](https://spring.io/projects/spring-boot)
+[![Redis](https://img.shields.io/badge/Redis-Cache-red)](https://redis.io/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Database-green)](https://www.mongodb.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-## Overview & Domain
+*Built on the [HL7 FHIR R4](http://hl7.org/fhir/R4/) Standard*
 
-**Project Name**: LifeLog EHR Backend
-
-**Description**: A high-performance, compliant Clinical Data Repository (CDR) built on the HL7 FHIR standard. It provides a robust backend for storing, retrieving, and managing clinical health data with sub-second latency and strict regulatory compliance features.
-
-**Problem Statement**: Modern healthcare applications require interoperable, scalable, and secure storage for complex clinical data. Building a compliant backend from scratch is resource-intensive. LifeLog solves this by offering a pre-configured, standard-compliant FHIR server facade backed by NoSQL storage for flexibility and performance.
-
-**Target Users**:
-*   **Clinician Apps**: Mobile/Web apps for doctors to view patient history.
-*   **Patient Portals**: Interfaces for patients to access their own records.
-*   **IoMT Devices**: Wearables and sensors pushing vital signs (Observations).
-*   **External Systems**: Insurance/Payer systems via standard FHIR APIs.
-
-**Core Business Capabilities**:
-*   **Clinical Data Management**: CRUD operations for Patients, Encounters, Conditions, Observations, Immunizations, etc.
-*   **Semantic Interoperability**: Enforces HL7 FHIR R4 standard structures and terminologies (LOINC, SNOMED).
-*   **Real-time Notifications**: Subscription-based webhooks for event-driven workflows.
-*   **Audit & Compliance**: Immutable audit trails for every access and modification.
-
-**Domain Model Overview**:
-*   **Administrative**: `Patient`, `Practitioner`, `Organization`, `Appointment`.
-*   **Clinical**: `Observation`, `Condition`, `Encounter`, `Immunization`, `MedicationRequest`, `DiagnosticReport`.
-*   **Infrastructure**: `Subscription` (webhooks), `AuditEvent`.
+</div>
 
 ---
 
-## Architecture & Design
+## 📋 Table of Contents
+- [Executive Summary](#-executive-summary)
+- [Key Features](#-key-features)
+- [Architecture & Design](#-architecture--design)
+  - [System Architecture](#system-architecture-diagram)
+  - [Request Lifecycle](#-request-lifecycle-sequence)
+  - [Service Responsibilities](#-service-responsibilities)
+- [Technology Stack](#-technology-stack)
+- [Getting Started](#-getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Quick Start](#quick-start-with-docker)
+- [API Reference](#-api-reference)
+  - [Clinical Resources](#clinical-resources)
+  - [Administrative Resources](#administrative-resources)
+  - [System](#system-endpoints)
+- [Operations Manual](#-operations-manual)
+  - [Configuration](#configuration)
+  - [Observability](#observability)
+  - [Troubleshooting](#troubleshooting)
+- [Developer Guide](#-developer-guide)
+- [Roadmap](#-roadmap)
 
-**Architecture Style**: **Modular Monolith (FHIR Facade)**.
-The system is designed as a high-performance facade that strictly adheres to the HL7 FHIR standard while leveraging the flexibility of a document-oriented database. It follows a layered, event-driven architecture to ensure scalability and responsiveness.
+---
 
-### 🏗️ System Architecture Diagram
+## 📝 Executive Summary
+
+**LifeLog EHR Backend** is a purpose-built, compliant backend component for modern Electronic Health Record (EHR) systems. It solves the complexity of building a healthcare data platform from scratch by providing a pre-configured **FHIR Facade** that is secure, scalable, and interoperable out of the box.
+
+Unlike traditional SQL-based EHRs, LifeLog leverages **MongoDB** to natively store FHIR JSON documents, offering superior flexibility for diverse clinical data types, while maintaining strict ACID compliance and validation rules.
+
+**Target Use Cases**:
+*   **Clinician Dashboards**: Real-time access to patient vitals and history.
+*   **IoMT Data Ingestion**: High-throughput writes from wearables.
+*   **Patient Portals**: Secure, granular access for patients.
+
+---
+
+## ✨ Key Features
+
+### 🩺 Clinical
+*   **Comprehensive Resource Support**: CRUD operations for `Patient`, `Observation`, `Encounter`, `Condition`, `Immunization`, `MedicationRequest`, and more.
+*   **Semantic Validation**: Strictly enforces FHIR R4 structure and cardinality.
+*   **Advanced Search**: Supports chained parameters (e.g., `subject.name`), dates, and token searches.
+
+### 🛡️ Security & Compliance
+*   **Audit Trails**: Asynchronous, immutable logging of every data access (`AuditEvent`).
+*   **Optimistic Locking**: Prevents "lost updates" using standard FHIR versioning (`Weak ETag`).
+*   **Input Sanitization**: Rejects malformed or unrecognized data structures.
+
+### 🚀 Technical
+*   **Event-Driven Architecture**: Non-blocking **Webhooks** (`Subscription`) for real-time integrations.
+*   **Write-Through Caching**: **Redis** layer for sub-millisecond read latency on hot data.
+*   **Scalable**: Stateless architecture ready for container orchestration (Kubernetes).
+
+---
+
+## 🏗 Architecture & Design
+
+**Style**: Modular Monolith (FHIR Facade)
+
+The system behaves as a protocol translator:
+1.  **Ingest**: Receives standard FHIR REST requests.
+2.  **Process**: Validates logic, enforces rules, and generates events.
+3.  **Persist**: Stores data as optimized Documents (MongoDB) and KV pairs (Redis).
+
+### System Architecture Diagram
 
 ```mermaid
 graph TD
@@ -61,7 +103,6 @@ graph TD
             Services -->|Logic & Rules| Repos[Repositories]
             Services -.->|Async| EventBus[Async Task Executor]
         end
-
         
         EventBus -->|Fire & Forget| AuditAsync[Audit Service]
         EventBus -->|Notify| SubAsync[Subscription Service]
@@ -76,35 +117,9 @@ graph TD
     SubAsync -.->|HTTP Webhook| External[External Systems]
 ```
 
-### 🧩 Component Details
+### 🔄 Request Lifecycle (Sequence)
 
-1.  **Gateway & Security**:
-    *   **Security Filter**: Handles Basic Authentication and protects private endpoints.
-    *   **Interceptors**: The `SmartOnFhirInterceptor` and `RequestValidatingInterceptor` gatekeep requests, ensuring they are authorized and structurally valid (FHIR R4 compliant) before reaching business logic.
-
-2.  **FHIR Facade (Providers)**:
-    *   Acts as the **Controller Layer**. It parses incoming FHIR JSON/XML and maps standard FHIR operations (Create, Read, Search) to internal service calls.
-    *   **Responsibility**: Protocol translation only; no business logic.
-
-3.  **Service Layer (Domain Core)**:
-    *   The heart of the application. It handles:
-        *   **ID Generation**: UUID assignment for new resources.
-        *   **Optimistic Locking**: Version checks to prevent lost updates.
-        *   **Search Logic**: Mapping FHIR search parameters (e.g., `date=gt2024`) to MongoDB Queries.
-        *   **Event Publishing**: Offloading side effects like auditing and webhooks.
-
-4.  **Data Access & Caching**:
-    *   **Write-Through Caching**: Data is written to MongoDB and immediately updated in Redis to ensure subsequent reads are fast and consistent.
-    *   **MongoDB**: Stores resources as "Documents" containing metadata (indexes) + the raw `fhirJson` blob.
-
-5.  **Event System (Async)**:
-    *   Uses Spring's `@Async` and a `ThreadPoolTaskExecutor`.
-    *   **Audit Service**: decoupling the mandatory logging from the critical path latency.
-    *   **Subscription Service**: Evaluating criteria match and dispatching webhooks in the background.
-
-### 🔄 Request Flow (Sequence Diagram)
-
-The following diagram illustrates the lifecycle of a **Create Observation** request, highlighting the separation of synchronous (user-facing) and asynchronous (system) tasks.
+How a **POST /Observation** moves through the system:
 
 ```mermaid
 sequenceDiagram
@@ -132,311 +147,167 @@ sequenceDiagram
     Provider-->>Client: 201 Created (Location Header)
 ```
 
-### 🧠 Domain Service Responsibilities
+### 🧠 Service Responsibilities
 
-| Service | Primary Responsibility | Key Interactions |
+| Service | Responsibility | Key Interactions |
 | :--- | :--- | :--- |
-| **PatientService** | Manages Patient Identity & Demographics. | Validates uniqueness; indexed search by Name/Gender. |
-| **ObservationService** | Handles Vitals, Labs, and Clinical results. | Links to `Patient`; Updates `Redis` cache; triggers `SubscriptionService`. |
-| **SubscriptionService** | Manages Webhooks & Event dispatch. | Matches resources against active Subscription criteria (e.g., `category=vital-signs`). |
-| **AuditService** | Records compliance logs. | Asynchronously writes to `audit_events` collection. |
-| **ValidationService** | Enforces Business Rules. | Checks reference integrity (e.g., "Does Patient X exist?"). |
+| **PatientService** | Identity Management | Indexed search by Name/Gender. |
+| **ObservationService** | Clinical Data Management | High-volume writes, Redis Caching. |
+| **SubscriptionService** | Webhooks | Matches `Criteria` (e.g., `code=123`) -> POST to URL. |
+| **AuditService** | Compliance | Asynchronous reliable logging. |
 
 ---
 
-## Tech Stack & Dependencies
+## 💻 Technology Stack
 
-**Core**:
-*   **Language**: Java 21 (LTS)
-*   **Framework**: Spring Boot 3.x / 4.x
-*   **Standard**: HAPI FHIR 6.x/8.x (R4)
-
-**Data & Storage**:
-*   **Database**: MongoDB 7.0 (Document Store)
-*   **Cache**: Redis 7.2 (Key-Value Store)
-
-**Infrastructure**:
-*   **Containerization**: Docker, Docker Compose
-*   **Build Tool**: Maven
-
-**Libraries**:
-*   **Lombok**: Boilerplate reduction.
-*   **Micrometer**: Metrics instrumentation (Prometheus).
+| Component | Technology | Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Core** | Java | 21 (LTS) | Language |
+| **Framework** | Spring Boot | 3.x / 4.x | App Framework |
+| **Standard** | HAPI FHIR | R4 | FHIR Parsing & Logic |
+| **Database** | MongoDB | 7.0 | Document Store |
+| **Cache** | Redis | 7.2 | Performance Layer |
+| **Build** | Maven | 3.9+ | Dependency Management |
+| **Ops** | Docker | Latest | Containerization |
 
 ---
 
-## Project Structure & Conventions
+## 🏁 Getting Started
 
+### Prerequisites
+*   **Docker Desktop** (Engine 20.10+)
+*   **Git**
+
+### Quick Start (with Docker)
+Run the entire stack (App + Mongo + Redis) in one command:
+
+```bash
+# 1. Clone Repo
+git clone https://github.com/al-das/lifelog-server.git
+cd lifelog-server
+
+# 2. Start Stack
+docker-compose up -d --build
+
+# 3. Verify (Wait ~30s for startup)
+curl http://localhost:8080/actuator/health
+# Expected: {"status":"UP"}
 ```
-src/main/java/com/al/lifelog/
-├── config/           # Spring & Lib configurations (Mongo, Redis, Security)
-├── interceptor/      # Request interceptors (Audit, Auth)
-├── model/            # MongoDB Entities (MongoPatient, MongoObservation)
-├── provider/         # FHIR Resource Providers (Controllers)
-├── repository/       # Spring Data MongoDB Repositories
-├── service/          # Business Logic & Transaction Management
-└── security/         # Security configurations
+
+### Manual Build
+If you prefer running without Docker:
+```bash
+# Ensure local Mongo (27017) and Redis (6379) are running
+mvn clean install
+java -jar target/lifelog-ehr-0.0.1-SNAPSHOT.jar
 ```
-
-**Layering Rules**:
-*   `Provider` can call `Service`.
-*   `Service` can call `Repository` and other `Services`.
-*   `Repository` accesses DB only.
-*   **Dependency Direction**: Outer layers depend on inner layers.
-
-**Error Handling**:
-*   **Framework**: HAPI FHIR Global Exception Handlers.
-*   **Mapping**:
-    *   `ResourceNotFoundException` -> 404
-    *   `UnprocessableEntityException` -> 422
-    *   `AuthenticationException` -> 401
-    *   Internal Errors -> 500 (OperationOutcome returned)
-
-**Validation**:
-*   **Input**: `RequestValidatingInterceptor` checks FHIR structural validity on POST/PUT.
-*   **Business**: Service layer checks (e.g., date ranges, reference integrity).
 
 ---
 
-## Configuration & Environments
+## 📚 API Reference
 
-**Environment Variables**:
+**Base URL**: `http://localhost:8080/fhir`
+
+> [!TIP]
+> All resources support `_format=json` and `_pretty=true` parameters.
+
+### Clinical Resources
+
+| Resource | Methods | Key Params | Description |
+| :--- | :--- | :--- | :--- |
+| **[Observation](http://hl7.org/fhir/R4/observation.html)** | `POST`, `GET`, `PUT` | `subject`, `code`, `date`, `subject.name` | Vitals, Lab Results. |
+| **[Condition](http://hl7.org/fhir/R4/condition.html)** | `POST`, `GET` | `subject`, `clinical-status` | Diagnoses (e.g., Diabetes). |
+| **[Encounter](http://hl7.org/fhir/R4/encounter.html)** | `POST`, `GET` | `subject`, `date` | Visits/Admissions. |
+| **[AllergyIntolerance](http://hl7.org/fhir/R4/allergyintolerance.html)** | `POST`, `GET` | `patient` | Active Allergies. |
+| **[Immunization](http://hl7.org/fhir/R4/immunization.html)** | `POST`, `GET` | `patient` | Vaccination history. |
+
+### Administrative Resources
+
+| Resource | Methods | Key Params | Description |
+| :--- | :--- | :--- | :--- |
+| **[Patient](http://hl7.org/fhir/R4/patient.html)** | `CRU_`, `Search` | `name`, `gender`, `_id` | Patient Demographics. |
+| **[Practitioner](http://hl7.org/fhir/R4/practitioner.html)** | `POST`, `GET` | `name` | Doctors/Nurses. |
+| **[organization](http://hl7.org/fhir/R4/organization.html)** | `POST`, `GET` | `name` | Hospital Departments. |
+
+### System Endpoints
+
+| Endpoint | Method | Purpose |
+| :--- | :--- | :--- |
+| `/metadata` | `GET` | **CapabilityStatement**: Server capabilities. |
+| `/actuator/prometheus` | `GET` | Metrics for Grafana. |
+| `/actuator/health` | `GET` | Kubernetes Liveness Probe. |
+
+---
+
+## ⚙️ Operations Manual
+
+### Configuration
+Key environment variables in `docker-compose.yml`:
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `SPRING_DATA_MONGODB_URI` | Connection string for MongoDB | `mongodb://mongo:27017/lifelog` |
-| `SERVER_PORT` | Application Port | `8080` |
-| `LOGGING_LEVEL_ROOT` | Log verbosity | `INFO` |
+| `SPRING_DATA_MONGODB_URI` | Mongo Connection | `mongodb://mongo:27017/lifelog` |
+| `SPRING_REDIS_HOST` | Redis Host | `redis` |
+| `SERVER_PORT` | App Port | `8080` |
+| `LOGGING_LEVEL_ROOT` | Global Log Level | `INFO` |
 
-**Config Files**:
-*   `application.yml`: Main configuration source.
+### Observability
+*   **Metrics**: Prometheus scraper available at `/actuator/prometheus`.
+*   **Logging**: STDOUT (Docker Logs).
 
-**Secrets Management**:
-*   Currently uses Environment Variables.
-*   **Recommendation**: Use Docker Secrets or Vault for production.
+### Troubleshooting
 
----
+<details>
+<summary><strong>❌ Port 8080 is already in use</strong></summary>
 
-## Setup, Installation & Local Development
+Stop the conflicting service or change `SERVER_PORT` in `docker-compose.yml` and recreate containers.
+</details>
 
-**Prerequisites**:
-*   Docker & Docker Compose
-*   Java 21 JDK (optional if using Docker)
-*   Maven 3.9+ (optional if using Docker)
+<details>
+<summary><strong>❌ MongoSocketOpenException</strong></summary>
 
-**Quick Start (Docker)**:
-
-1.  **Clone the repository**:
-    ```bash
-    git clone <repo-url>
-    cd LifeLog
-    ```
-
-2.  **Start Services**:
-    ```bash
-    docker-compose up -d --build
-    ```
-    *   Starts Backend (8080)
-    *   Starts MongoDB (27017)
-    *   Starts Redis (6379)
-
-3.  **Verify Status**:
-    ```bash
-    docker-compose ps
-    ```
-
-**Database**:
-*   MongoDB initializes automatically.
-*   Data is persisted in the `mongo-data` volume.
+Ensure the `mongo` container is healthy. If running locally (not Docker), change connection string to `localhost:27017`.
+</details>
 
 ---
 
-## Running & Operations
+## 💻 Developer Guide
 
-**Ports**:
-*   **Local/Dev**: `http://localhost:8080`
+### Project Structure
+```
+src/main/java/com/al/lifelog/
+├── config/           # App Configuration (Beans)
+├── interceptor/      # AOP (Audit, Auth)
+├── model/            # Mongo Documents
+├── provider/         # FHIR Controllers
+├── repository/       # DB Access
+├── service/          # Business Logic
+```
 
-**Health & Probes**:
-*   **Liveness/Readiness**: `GET /actuator/health`
-    *   Returns `200 OK` with status `UP` if DB and Redis are connected.
-
-**Metrics**:
-*   **Prometheus**: `GET /actuator/prometheus`
-    *   Exposes `fhir_patient_created`, JVM metrics, HTTP latency.
-
-**Shutdown**:
-*   Supports graceful shutdown via Spring Boot (SIGTERM).
-
----
-
-## API & Usage
-
-**Base URL**: `http://localhost:8080/fhir`
-**Authentication**: Basic Auth (`admin`/`password`).
-**Response Format**: `application/fhir+json`
-
-### 📚 API Reference & Endpoints
-
-| Resource | Method | Path | Query Parameters / Body | Description & Usage |
-| :--- | :--- | :--- | :--- | :--- |
-| **Patient** | `POST` | `/Patient` | JSON Body (Patient resource) | Create a new Patient. Returns `201 Created` with `Location` header. |
-| | `GET` | `/Patient/{id}` | N/A | Read Patient by ID. Returns `200 OK` or `404 Not Found`. |
-| | `PUT` | `/Patient/{id}` | JSON Body | Update existing Patient. Uses optimistic locking via `@Version`. |
-| | `DELETE` | `/Patient/{id}` | N/A | Soft-delete Patient. Checks for active references if enabled. |
-| | `GET` | `/Patient/{id}/_history` | N/A | Retrieve version history of a Patient. |
-| | `GET` | `/Patient` | `_id`, `name` (regex), `gender`<br>`_include=Patient:observation`<br>`_revinclude=Observation:patient` | Search Patients. Supports advanced inclusion/reverse inclusion of Observations. |
-| **Observation** | `POST` | `/Observation` | JSON Body | Record clinical observations (Vitals, Labs). |
-| | `GET` | `/Observation/{id}` | N/A | Read Observation by ID. |
-| | `PUT` | `/Observation/{id}` | JSON Body | Update or correct an Observation. |
-| | `GET` | `/Observation` | `subject` (Ref), `subject.name` (Chained), `code`, `date`<br>`_include=Observation:patient` | Search with chained patient name (e.g., `subject.name=John`) or date ranges. |
-| **Encounter** | `POST` | `/Encounter` | JSON Body | Create a Visit/Encounter. |
-| | `GET` | `/Encounter` | `subject` (Patient Ref), `date` (Range) | Find Encounters for a patient within a date range. |
-| **Condition** | `POST` | `/Condition` | JSON Body | Record Diagnoses or Problems. |
-| | `GET` | `/Condition` | `subject` (Patient Ref), `code` (SNOMED) | distinct `active` or `resolved` conditions by code. |
-| **MedicationRequest** | `POST` | `/MedicationRequest` | JSON Body | Order medications. |
-| | `GET` | `/MedicationRequest` | `subject` (Patient Ref) | List active medication orders for a patient. |
-| **AllergyIntolerance**| `POST` | `/AllergyIntolerance`| JSON Body | Record allergies (Food, Drug, Enviro). |
-| | `GET` | `/AllergyIntolerance`| `patient` (Patient Ref) | List known allergies. |
-| **Appointment** | `POST` | `/Appointment` | JSON Body | Schedule future appointments. |
-| | `GET` | `/Appointment` | `actor` (Patient/Practitioner Ref) | Find appointments for a specific person. |
-| **DiagnosticReport** | `POST` | `/DiagnosticReport` | JSON Body | Store Lab/Imaging reports. |
-| | `GET` | `/DiagnosticReport` | `subject`, `code` | Retrieve reports by patient and test type. |
-| **Immunization** | `POST` | `/Immunization` | JSON Body | Record vaccinations. |
-| | `GET` | `/Immunization` | `patient`, `vaccine-code` | List vaccination history. |
-| **Organization** | `POST` | `/Organization` | JSON Body | Register Healthcare Orgs/Depts. |
-| | `GET` | `/Organization` | `name` | Find Organizations by name. |
-| **Practitioner** | `POST` | `/Practitioner` | JSON Body | Register Doctors/Nurses. |
-| | `GET` | `/Practitioner` | `name` | Find Practitioners by name. |
-| **Subscription** | `POST` | `/Subscription` | JSON Body (Criteria + Channel) | Register Webhook listeners (e.g., "Notify on new Observation"). |
-| | `DELETE` | `/Subscription/{id}` | N/A | Unsubscribe from notifications. |
-| **System** | `GET` | `/metadata` | N/A | **CapabilityStatement**: Lists all supported resources and interactions. |
-| | `GET` | `/.well-known/smart-configuration`| N/A | SMART on FHIR discovery configuration. |
-
-
----
-
-## Data & Persistence
-
-**Data Model**:
-*   **Storage Strategy**: Resources are stored as documents containing metadata fields + a full `fhirJson` string.
-*   **Collections**:
-    *   `patients`
-    *   `observations`
-    *   `encounters`
-    *   `audit_events` (Audit Logs)
-
-**Indexing**:
-*   **Compound Indexes**: Example: `Patient` (family, given).
-*   **Text Indexes**: For fuzzy search support.
-
-**Retention**:
-*   **Audit Logs**: Hard delete not implemented; assume indefinite retention for compliance.
-
----
-
-## Security & Compliance
-
-**Security Model**:
-*   **Transport**: HTTPS required in production (TLS termination at ingress/LB).
-*   **Authentication**: Interceptor-based checks. Public endpoints are explicitly allow-listed.
-
-**Audit Logging**:
-*   Every modify/access action is logged to `audit_events`.
-*   **Fields**: Who (User/IP), What (Resource), When, Outcome.
-
-**Input Sanitization**:
-*   Strict FHIR parsing rejects malformed JSON or unknown fields.
-
----
-
-## Testing & Quality
-
-**Test Types**:
-*   **Unit Tests**: JUnit 5 + Mockito. Focus on Service logic.
-*   **Integration Tests**: Postman + Newman. Focus on HTTP/Controller layer and end-to-end flows.
-
-**Run Tests Locally**:
+### Running Tests
 ```bash
-# Unit Tests
+# Unit Tests (Fast)
 mvn test
 
-# Integration Tests (Requires server running)
-newman run tests/postman/LifeLog_Integration_Tests.postman_collection.json -e tests/postman/LifeLog_Local.postman_environment.json
+# Integration Tests (Requires running server)
+# Uses Newman (Postman CLI)
+newman run tests/postman/LifeLog_Integration_Tests.postman_collection.json \
+  -e tests/postman/LifeLog_Local.postman_environment.json
 ```
 
 ---
 
-## Observability: Logging, Metrics, Tracing
+## 🗺 Roadmap
 
-**Logging**:
-*   **Format**: Plain text / Console (Local).
-*   **Levels**:
-    *   `INFO`: Standard operations, startup.
-    *   `ERROR`: Exceptions, validation failures.
-
-**Metrics**:
-*   Exposed via Micrometer/Actuator.
-*   **Custom Metrics**:
-    *   `fhir.patient.created` (Counter)
-    *   `fhir.observation.created` (Counter)
+- [x] **Core FHIR Resources** (Patient, Obs, Condition, etc.)
+- [x] **Advanced Search** (Chained Parameters)
+- [x] **Docker Support**
+- [ ] **OAuth2 / SMART on FHIR**
+- [ ] **Terminology Services** (Validation against LOINC/SNOMED)
+- [ ] **Bulk Export ($export)**
 
 ---
 
-## CI/CD, Deployment & Environments
-
-**Environments**:
-*   **Local**: Docker Compose (`localhost:8080`)
-*   **Dev/Staging**: (Placeholder)
-*   **Production**: (Placeholder)
-
-**Deployment Strategy**:
-*   **Container**: Build Docker image -> Push to Registry -> Deploy to Orchestrator (K8s/ECS).
-
----
-
-## Integrations & External Systems
-
-*   **Subscribers**: Any external system registering a `rest-hook` Subscription.
-    *   **Retry Policy**: Basic try/catch (Currently). Recommended to implement exponential backoff via Queue.
-
----
-
----
-
-## 🛠️ Troubleshooting & Support
-
-**Issue: Port Conflicts**
-`Web server failed to start. Port 8080 was already in use.`
-*   **Fix**: Stop other services running on port 8080 or modify `SERVER_PORT` in `docker-compose.yml`.
-
-**Issue: Database Connection Refused**
-`MongoSocketOpenException: Exception opening socket`
-*   **Fix**: Ensure `mongo` container is healthy. If running outside Docker, check `application.yml` points to `localhost:27017`.
-
-**Issue: Search Returns Empty**
-*   **Fix**: Search parameters are case-sensitive. Check if the resource actually exists using `GET /Resource/{id}`.
-
----
-
-## ⚡ Performance Tuning
-
-**Java / JVM**:
-*   **Heap Size**: Configure via `JAVA_OPTS` in Docker. Suggested: `-Xms512m -Xmx2048m` for production.
-*   **GC**: G1GC is default in Java 21, optimized for low latency.
-
-**Database (MongoDB)**:
-*   Ensure indexes exist for all query fields. LifeLog creates them on startup, but verify via `mongosh`.
-
-**Caching**:
-*   Adjust `spring.cache.redis.time-to-live` based on data volatility. Current: 10 minutes.
-
----
-
-## Governance, Ownership & Future Work
-
-**Owner**: Engineering Team (LifeLog)
-
-**Roadmap**:
-*   [ ] OAuth2 / SMART on FHIR full compliance.
-*   [ ] Terminology Server Integration.
-*   [ ] Bulk Data Export ($export).
+<div align="center">
+    <sub>Maintained by the LifeLog Engineering Team.</sub>
+</div>
