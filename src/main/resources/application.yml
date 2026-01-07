@@ -10,17 +10,60 @@ spring:
     name: LifeLog
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://mongo:27017/lifelog}
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/lifelog}
     redis:
-      host: redis
+      host: localhost
       port: 6379
   security:
-    admin:
-      username: admin
-      password: password
-    clinical:
-      username: clinician
-      password: password
+    users:
+      physician:
+        username: physician
+        password: password
+        roles: PHYSICIAN
+      nurse:
+        username: nurse
+        password: password
+        roles: NURSE
+      pharmacist:
+        username: pharmacist
+        password: password
+        roles: PHARMACIST
+      lab_tech:
+        username: lab_tech
+        password: password
+        roles: LAB_TECH
+      registrar:
+        username: registrar
+        password: password
+        roles: REGISTRAR
+      scheduler:
+        username: scheduler
+        password: password
+        roles: SCHEDULER
+      biller:
+        username: biller
+        password: password
+        roles: BILLER
+      practice_mgr:
+        username: practice_mgr
+        password: password
+        roles: PRACTICE_MGR
+      sys_admin:
+        username: sys_admin
+        password: password
+        roles: SYS_ADMIN
+      auditor:
+        username: auditor
+        password: password
+        roles: AUDITOR
+      integrator:
+        username: integrator
+        password: password
+        roles: INTEGRATOR
+      patient:
+        username: patient_user
+        password: password
+        roles: PATIENT
 
   fhir:
     server:
@@ -30,7 +73,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics,metrics
+        include: health,info,prometheus,metrics
   endpoint:
     health:
       show-details: always

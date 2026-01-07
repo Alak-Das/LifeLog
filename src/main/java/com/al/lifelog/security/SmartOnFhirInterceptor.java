@@ -17,7 +17,7 @@ public class SmartOnFhirInterceptor extends AuthorizationInterceptor {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || !authentication.isAuthenticated()) {
-            return new RuleBuilder().denyAll().build();
+            return new RuleBuilder().allow().metadata().build();
         }
 
         RuleBuilder builder = new RuleBuilder();

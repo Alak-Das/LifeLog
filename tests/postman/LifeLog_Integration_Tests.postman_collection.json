@@ -23,6 +23,9 @@
 	"item": [
 		{
 			"name": "0. Discovery & Metadata",
+			"auth": {
+				"type": "noauth"
+			},
 			"item": [
 				{
 					"name": "SMART Configuration",
@@ -69,12 +72,12 @@
 				"basic": [
 					{
 						"key": "password",
-						"value": "{{admin_password}}",
+						"value": "{{registrar_password}}",
 						"type": "string"
 					},
 					{
 						"key": "username",
-						"value": "{{admin_username}}",
+						"value": "{{registrar_username}}",
 						"type": "string"
 					}
 				]
@@ -319,12 +322,12 @@
 				"basic": [
 					{
 						"key": "password",
-						"value": "{{clinical_password}}",
+						"value": "{{physician_password}}",
 						"type": "string"
 					},
 					{
 						"key": "username",
-						"value": "{{clinical_username}}",
+						"value": "{{physician_username}}",
 						"type": "string"
 					}
 				]
@@ -523,12 +526,12 @@
 				"basic": [
 					{
 						"key": "password",
-						"value": "{{clinical_password}}",
+						"value": "{{physician_password}}",
 						"type": "string"
 					},
 					{
 						"key": "username",
-						"value": "{{clinical_username}}",
+						"value": "{{physician_username}}",
 						"type": "string"
 					}
 				]
@@ -647,12 +650,12 @@
 				"basic": [
 					{
 						"key": "password",
-						"value": "{{clinical_password}}",
+						"value": "{{physician_password}}",
 						"type": "string"
 					},
 					{
 						"key": "username",
-						"value": "{{clinical_username}}",
+						"value": "{{physician_username}}",
 						"type": "string"
 					}
 				]
@@ -771,12 +774,12 @@
 				"basic": [
 					{
 						"key": "password",
-						"value": "{{clinical_password}}",
+						"value": "{{nurse_password}}",
 						"type": "string"
 					},
 					{
 						"key": "username",
-						"value": "{{clinical_username}}",
+						"value": "{{nurse_username}}",
 						"type": "string"
 					}
 				]
@@ -806,6 +809,21 @@
 						}
 					],
 					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{lab_tech_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{lab_tech_username}}",
+									"type": "string"
+								}
+							]
+						},
 						"method": "POST",
 						"header": [
 							{
@@ -895,12 +913,12 @@
 				"basic": [
 					{
 						"key": "password",
-						"value": "{{admin_password}}",
+						"value": "{{practice_mgr_password}}",
 						"type": "string"
 					},
 					{
 						"key": "username",
-						"value": "{{admin_username}}",
+						"value": "{{practice_mgr_username}}",
 						"type": "string"
 					}
 				]
@@ -1019,12 +1037,12 @@
 				"basic": [
 					{
 						"key": "password",
-						"value": "{{admin_password}}",
+						"value": "{{scheduler_password}}",
 						"type": "string"
 					},
 					{
 						"key": "username",
-						"value": "{{admin_username}}",
+						"value": "{{scheduler_username}}",
 						"type": "string"
 					}
 				]
@@ -1091,12 +1109,12 @@
 				"basic": [
 					{
 						"key": "password",
-						"value": "{{admin_password}}",
+						"value": "{{sys_admin_password}}",
 						"type": "string"
 					},
 					{
 						"key": "username",
-						"value": "{{admin_username}}",
+						"value": "{{sys_admin_username}}",
 						"type": "string"
 					}
 				]
@@ -1163,12 +1181,12 @@
 				"basic": [
 					{
 						"key": "password",
-						"value": "{{admin_password}}",
+						"value": "{{registrar_password}}",
 						"type": "string"
 					},
 					{
 						"key": "username",
-						"value": "{{admin_username}}",
+						"value": "{{registrar_username}}",
 						"type": "string"
 					}
 				]
@@ -1276,6 +1294,21 @@
 		},
 		{
 			"name": "4. Observability & Performance",
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{sys_admin_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{sys_admin_username}}",
+						"type": "string"
+					}
+				]
+			},
 			"item": [
 				{
 					"name": "Prometheus Metrics",
@@ -1346,18 +1379,729 @@
 			]
 		},
 		{
+			"name": "6. RBAC Verification (Role-Based Access Control)",
+			"item": [
+				{
+					"name": "Negative: Registrar cannot read Observation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403 Forbidden\", function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{registrar_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{registrar_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/fhir/Observation/{{observation_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Observation",
+								"{{observation_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Negative: Physician cannot create Organization",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403 Forbidden\", function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{physician_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{physician_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Organization\",\n  \"name\": \"Restricted Clinical Org\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Organization",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Organization"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Positive: Pharmacist can read MedicationRequest",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{pharmacist_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{pharmacist_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/fhir/MedicationRequest/{{medrequest_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"MedicationRequest",
+								"{{medrequest_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Positive: Biller can read Encounter",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{biller_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{biller_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/fhir/Encounter/{{encounter_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Encounter",
+								"{{encounter_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Positive: Patient User can read Patient",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{patient_user_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{patient_user_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient/{{patient_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient",
+								"{{patient_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Negative: Pharmacist cannot create Patient",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403 Forbidden\", function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{pharmacist_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{pharmacist_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Patient\",\n  \"name\": [\n    {\n      \"family\": \"Restricted\",\n      \"given\": [\n        \"Pharmacist\"\n      ]\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Positive: Scheduler can read Practitioner",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{scheduler_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{scheduler_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/fhir/Practitioner/{{practitioner_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Practitioner",
+								"{{practitioner_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Positive: Lab Tech can create Observation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{lab_tech_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{lab_tech_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Observation\",\n  \"status\": \"final\",\n  \"code\": {\n    \"coding\": [\n      {\n        \"system\": \"http://loinc.org\",\n        \"code\": \"2160-0\",\n        \"display\": \"Creatinine\"\n      }\n    ]\n  },\n  \"subject\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  },\n  \"valueQuantity\": {\n    \"value\": 0.9,\n    \"unit\": \"mg/dL\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Observation",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Observation"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Negative: Lab Tech cannot read Condition",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403 Forbidden\", function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{lab_tech_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{lab_tech_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/fhir/Condition/{{condition_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Condition",
+								"{{condition_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Negative: Pharmacist cannot create Observation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403 Forbidden\", function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{pharmacist_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{pharmacist_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Observation\",\n  \"status\": \"final\",\n  \"code\": {\n    \"coding\": [\n      {\n        \"system\": \"http://loinc.org\",\n        \"code\": \"29463-7\",\n        \"display\": \"Body weight\"\n      }\n    ]\n  },\n  \"subject\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  },\n  \"valueQuantity\": {\n    \"value\": 70,\n    \"unit\": \"kg\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Observation",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Observation"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Negative: Biller cannot create Observation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403 Forbidden\", function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{biller_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{biller_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Observation\",\n  \"status\": \"final\",\n  \"code\": {\n    \"coding\": [\n      {\n        \"system\": \"http://loinc.org\",\n        \"code\": \"29463-7\",\n        \"display\": \"Body weight\"\n      }\n    ]\n  },\n  \"subject\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  },\n  \"valueQuantity\": {\n    \"value\": 70,\n    \"unit\": \"kg\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Observation",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Observation"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Positive: Integrator can create Observation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{integrator_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{integrator_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/fhir+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"resourceType\": \"Observation\",\n  \"status\": \"final\",\n  \"code\": {\n    \"coding\": [\n      {\n        \"system\": \"http://loinc.org\",\n        \"code\": \"8867-4\",\n        \"display\": \"Heart rate\"\n      }\n    ]\n  },\n  \"subject\": {\n    \"reference\": \"Patient/{{patient_id}}\"\n  },\n  \"valueQuantity\": {\n    \"value\": 72,\n    \"unit\": \"bpm\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/fhir/Observation",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Observation"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Negative: Integrator cannot read Patient",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403 Forbidden\", function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{integrator_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{integrator_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/fhir/Patient/{{patient_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"Patient",
+								"{{patient_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Positive: Nurse can read MedicationRequest",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{nurse_password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{nurse_username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/fhir/MedicationRequest/{{medrequest_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"fhir",
+								"MedicationRequest",
+								"{{medrequest_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "5. Cleanup",
 			"auth": {
 				"type": "basic",
 				"basic": [
 					{
 						"key": "password",
-						"value": "{{admin_password}}",
+						"value": "{{registrar_password}}",
 						"type": "string"
 					},
 					{
 						"key": "username",
-						"value": "{{admin_username}}",
+						"value": "{{registrar_username}}",
 						"type": "string"
 					}
 				]
@@ -1405,22 +2149,122 @@
 			"type": "string"
 		},
 		{
-			"key": "admin_username",
-			"value": "admin",
+			"key": "physician_username",
+			"value": "physician",
 			"type": "string"
 		},
 		{
-			"key": "admin_password",
+			"key": "physician_password",
 			"value": "password",
 			"type": "string"
 		},
 		{
-			"key": "clinical_username",
-			"value": "clinician",
+			"key": "nurse_username",
+			"value": "nurse",
 			"type": "string"
 		},
 		{
-			"key": "clinical_password",
+			"key": "nurse_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "registrar_username",
+			"value": "registrar",
+			"type": "string"
+		},
+		{
+			"key": "registrar_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "lab_tech_username",
+			"value": "lab_tech",
+			"type": "string"
+		},
+		{
+			"key": "lab_tech_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "sys_admin_username",
+			"value": "sys_admin",
+			"type": "string"
+		},
+		{
+			"key": "sys_admin_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "practice_mgr_username",
+			"value": "practice_mgr",
+			"type": "string"
+		},
+		{
+			"key": "practice_mgr_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "scheduler_username",
+			"value": "scheduler",
+			"type": "string"
+		},
+		{
+			"key": "scheduler_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "biller_username",
+			"value": "biller",
+			"type": "string"
+		},
+		{
+			"key": "biller_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "auditor_username",
+			"value": "auditor",
+			"type": "string"
+		},
+		{
+			"key": "auditor_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "integrator_username",
+			"value": "integrator",
+			"type": "string"
+		},
+		{
+			"key": "integrator_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "pharmacist_username",
+			"value": "pharmacist",
+			"type": "string"
+		},
+		{
+			"key": "pharmacist_password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "patient_user_username",
+			"value": "patient_user",
+			"type": "string"
+		},
+		{
+			"key": "patient_user_password",
 			"value": "password",
 			"type": "string"
 		},
