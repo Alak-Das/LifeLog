@@ -7,34 +7,54 @@ import ca.uhn.fhir.parser.IParser;
 import org.hl7.fhir.r4.model.Appointment;
 import org.hl7.fhir.r4.model.Appointment.AppointmentParticipantComponent;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 @Service
 public class AppointmentService {
 
-    @Autowired
-    private AppointmentRepository repository;
+    private final AppointmentRepository repository;
+    private final StringRedisTemplate redisTemplate;
+    private final FhirContext ctx;
+    private final MongoTemplate mongoTemplate;
 
     @Autowired
-    private StringRedisTemplate redisTemplate;
-
-    @Autowired
-    private FhirContext ctx;
+    public AppointmentService(AppointmentRepository repository,
+            StringRedisTemplate redisTemplate,
+            FhirContext ctx,
+            MongoTemplate mongoTemplate) {
+        this.repository = repository;
+        this.redisTemplate = redisTemplate;
+        this.ctx = ctx;
+        this.mongoTemplate = mongoTemplate;
+    }
 
     public Appointment createAppointment(Appointment appointment) {
-        IParser parser = ctx.newJsonParser();
-        String json = parser.encodeResourceToString(appointment);
-
-        MongoAppointment mongoAppt = new MongoAppointment();
+        // 1. Generate ID if missing
+        String id;
         if (appointment.hasIdElement() && !appointment.getIdElement().isEmpty()) {
-            mongoAppt.setId(appointment.getIdElement().getIdPart());
+            id = appointment.getIdElement().getIdPart();
+        } else {
+            id = UUID.randomUUID().toString();
+            appointment.setId(id);
         }
+
+        // 2. Prepare Mongo Document
+        MongoAppointment mongoAppt = new MongoAppointment();
+        mongoAppt.setId(id);
 
         if (appointment.hasStatus()) {
             mongoAppt.setStatus(appointment.getStatus().toCode());
@@ -50,13 +70,16 @@ public class AppointmentService {
             }
         }
 
+        // 3. Serialize
+        IParser parser = ctx.newJsonParser();
+        String json = parser.encodeResourceToString(appointment);
         mongoAppt.setFhirJson(json);
-        mongoAppt = repository.save(mongoAppt);
 
-        appointment.setId(mongoAppt.getId());
-        String finalJson = ctx.newJsonParser().encodeResourceToString(appointment);
+        // 4. Save
+        repository.save(mongoAppt);
 
-        redisTemplate.opsForValue().set("appointment:" + mongoAppt.getId(), finalJson, Duration.ofMinutes(10));
+        // 5. Cache
+        redisTemplate.opsForValue().set("appointment:" + id, json, Duration.ofMinutes(10));
 
         return appointment;
     }
@@ -70,26 +93,44 @@ public class AppointmentService {
         Optional<MongoAppointment> result = repository.findById(id);
         if (result.isPresent()) {
             Appointment a = ctx.newJsonParser().parseResource(Appointment.class, result.get().getFhirJson());
-            a.setId(id);
-            String jsonWithId = ctx.newJsonParser().encodeResourceToString(a);
-            redisTemplate.opsForValue().set("appointment:" + id, jsonWithId, Duration.ofMinutes(10));
+            if (!a.hasId()) {
+                a.setId(id);
+            }
+            redisTemplate.opsForValue().set("appointment:" + id, result.get().getFhirJson(), Duration.ofMinutes(10));
             return a;
         }
         return null;
     }
 
-    public List<Appointment> searchAppointments(String patientId) {
-        List<MongoAppointment> results;
-        if (patientId != null) {
-            results = repository.findByPatientId(patientId);
-        } else {
-            results = repository.findAll();
+    public List<Appointment> searchAppointments(String patientId, int offset, int count) {
+        Query query = new Query();
+
+        if (patientId != null && !patientId.isEmpty()) {
+            query.addCriteria(Criteria.where("patientId").is(patientId));
         }
+
+        if (query.getQueryObject().isEmpty()) {
+            if (offset == 0 && count <= 0) {
+                // Match original behavior: findAll if no criteria
+            } else {
+                // If pagination provided, use it
+            }
+        }
+
+        int limit = (count > 0) ? count : 10;
+        int skip = (offset >= 0) ? offset : 0;
+
+        Pageable pageable = PageRequest.of(skip / limit, limit);
+        query.with(pageable);
+
+        List<MongoAppointment> results = mongoTemplate.find(query, MongoAppointment.class);
 
         return results.stream()
                 .map(appt -> {
                     Appointment a = ctx.newJsonParser().parseResource(Appointment.class, appt.getFhirJson());
-                    a.setId(appt.getId());
+                    if (a.getId() == null || a.getId().isEmpty()) {
+                        a.setId(appt.getId());
+                    }
                     return a;
                 })
                 .collect(Collectors.toList());

@@ -51,6 +51,18 @@ public class FhirRestfulServerConfig {
     @Autowired
     private AuditLoggingInterceptor auditLoggingInterceptor;
 
+    @Autowired
+    private com.lifelog.ehr.provider.PractitionerResourceProvider practitionerResourceProvider;
+
+    @Autowired
+    private com.lifelog.ehr.provider.OrganizationResourceProvider organizationResourceProvider;
+
+    @Autowired
+    private com.lifelog.ehr.provider.DiagnosticReportResourceProvider diagnosticReportResourceProvider;
+
+    @Autowired
+    private com.lifelog.ehr.provider.ImmunizationResourceProvider immunizationResourceProvider;
+
     @Bean
     public SmartOnFhirInterceptor smartOnFhirInterceptor() {
         return new SmartOnFhirInterceptor();
@@ -81,7 +93,11 @@ public class FhirRestfulServerConfig {
                 encounterResourceProvider,
                 medicationRequestResourceProvider,
                 allergyIntoleranceResourceProvider,
-                appointmentResourceProvider));
+                appointmentResourceProvider,
+                practitionerResourceProvider,
+                organizationResourceProvider,
+                diagnosticReportResourceProvider,
+                immunizationResourceProvider));
 
         // Register Interceptors
         server.registerInterceptor(smartOnFhirInterceptor());

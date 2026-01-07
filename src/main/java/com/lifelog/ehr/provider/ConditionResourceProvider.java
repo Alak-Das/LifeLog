@@ -42,9 +42,16 @@ public class ConditionResourceProvider implements IResourceProvider {
     @Search
     public List<Condition> search(
             @OptionalParam(name = Condition.SP_SUBJECT) ReferenceParam subject,
-            @OptionalParam(name = Condition.SP_CODE) TokenParam code) {
+            @OptionalParam(name = Condition.SP_CODE) TokenParam code,
+            @OptionalParam(name = "_count") ca.uhn.fhir.rest.param.NumberParam count,
+            @OptionalParam(name = "_offset") ca.uhn.fhir.rest.param.NumberParam offset) {
+
         String subjectVal = (subject != null) ? subject.getIdPart() : null;
         String codeVal = (code != null) ? code.getValue() : null;
-        return conditionService.searchConditions(subjectVal, codeVal);
+
+        int countVal = (count != null) ? count.getValue().intValue() : 10;
+        int offsetVal = (offset != null) ? offset.getValue().intValue() : 0;
+
+        return conditionService.searchConditions(subjectVal, codeVal, offsetVal, countVal);
     }
 }

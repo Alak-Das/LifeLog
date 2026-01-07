@@ -31,6 +31,9 @@ public class ObservationServiceTest {
     @Mock
     private ValueOperations<String, String> valueOperations;
 
+    @Mock
+    private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+
     @Spy
     private FhirContext ctx = FhirContext.forR4();
 
@@ -41,6 +44,7 @@ public class ObservationServiceTest {
     public void testCreateObservation_ShouldIndexFields() {
         // Setup
         Observation obs = new Observation();
+        obs.setId("obs-1");
         obs.setSubject(new Reference("Patient/123"));
         obs.getCode().addCoding().setCode("8867-4"); // Heart Rate
 
@@ -52,7 +56,7 @@ public class ObservationServiceTest {
             MongoObservation mo = invocation.getArgument(0);
             assertEquals("Patient/123", mo.getSubjectId());
             assertEquals("8867-4", mo.getCode());
-            mo.setId("obs-1");
+            assertEquals("obs-1", mo.getId());
             return mo;
         });
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -66,17 +70,21 @@ public class ObservationServiceTest {
     }
 
     @Test
-    public void testSearch_BySubject_ShouldCallRepository() {
+    public void testSearch_BySubject_ShouldCallMongoTemplate() {
         // Setup
         String subject = "Patient/123";
         MongoObservation mo = new MongoObservation("obs-1", "{\"resourceType\":\"Observation\",\"id\":\"obs-1\"}");
-        when(repository.findBySubjectId(subject)).thenReturn(List.of(mo));
+
+        when(mongoTemplate.find(any(org.springframework.data.mongodb.core.query.Query.class),
+                eq(MongoObservation.class)))
+                .thenReturn(List.of(mo));
 
         // Execute
-        List<Observation> results = service.searchObservations(subject, null);
+        List<Observation> results = service.searchObservations(subject, null, 0, 10);
 
         // Verify
         assertEquals(1, results.size());
-        verify(repository).findBySubjectId(subject);
+        verify(mongoTemplate).find(any(org.springframework.data.mongodb.core.query.Query.class),
+                eq(MongoObservation.class));
     }
 }

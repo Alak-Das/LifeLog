@@ -6,6 +6,9 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
 import org.hl7.fhir.r4.model.Condition;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -13,28 +16,43 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import java.util.stream.Collectors;
 
 @Service
 public class ConditionService {
 
-    @Autowired
-    private ConditionRepository repository;
+    private final ConditionRepository repository;
+    private final StringRedisTemplate redisTemplate;
+    private final FhirContext ctx;
+    private final MongoTemplate mongoTemplate;
 
     @Autowired
-    private StringRedisTemplate redisTemplate;
-
-    @Autowired
-    private FhirContext ctx;
+    public ConditionService(ConditionRepository repository,
+            StringRedisTemplate redisTemplate,
+            FhirContext ctx,
+            MongoTemplate mongoTemplate) {
+        this.repository = repository;
+        this.redisTemplate = redisTemplate;
+        this.ctx = ctx;
+        this.mongoTemplate = mongoTemplate;
+    }
 
     public Condition createCondition(Condition condition) {
-        IParser parser = ctx.newJsonParser();
-        String json = parser.encodeResourceToString(condition);
-
-        MongoCondition mongoCond = new MongoCondition();
+        // 1. Generate ID if missing
+        String id;
         if (condition.hasIdElement() && !condition.getIdElement().isEmpty()) {
-            mongoCond.setId(condition.getIdElement().getIdPart());
+            id = condition.getIdElement().getIdPart();
+        } else {
+            id = UUID.randomUUID().toString();
+            condition.setId(id);
         }
+
+        // 2. Prepare Mongo Document
+        MongoCondition mongoCond = new MongoCondition();
+        mongoCond.setId(id);
 
         if (condition.hasSubject() && condition.getSubject().hasReference()) {
             mongoCond.setSubjectId(condition.getSubject().getReference());
@@ -43,13 +61,16 @@ public class ConditionService {
             mongoCond.setCode(condition.getCode().getCodingFirstRep().getCode());
         }
 
+        // 3. Serialize
+        IParser parser = ctx.newJsonParser();
+        String json = parser.encodeResourceToString(condition);
         mongoCond.setFhirJson(json);
-        mongoCond = repository.save(mongoCond);
 
-        condition.setId(mongoCond.getId());
-        String finalJson = ctx.newJsonParser().encodeResourceToString(condition);
+        // 4. Save
+        repository.save(mongoCond);
 
-        redisTemplate.opsForValue().set("condition:" + mongoCond.getId(), finalJson, Duration.ofMinutes(10));
+        // 5. Cache
+        redisTemplate.opsForValue().set("condition:" + id, json, Duration.ofMinutes(10));
         return condition;
     }
 
@@ -62,33 +83,46 @@ public class ConditionService {
         Optional<MongoCondition> result = repository.findById(id);
         if (result.isPresent()) {
             Condition c = ctx.newJsonParser().parseResource(Condition.class, result.get().getFhirJson());
-            c.setId(id);
-            String jsonWithId = ctx.newJsonParser().encodeResourceToString(c);
-            redisTemplate.opsForValue().set("condition:" + id, jsonWithId, Duration.ofMinutes(10));
+            if (!c.hasId()) {
+                c.setId(id);
+            }
+            redisTemplate.opsForValue().set("condition:" + id, result.get().getFhirJson(), Duration.ofMinutes(10));
             return c;
         }
         return null;
     }
 
-    public List<Condition> searchConditions(String subject, String code) {
-        if (subject == null && code == null)
-            return Collections.emptyList();
+    public List<Condition> searchConditions(String subject, String code, int offset, int count) {
+        Query query = new Query();
 
-        List<MongoCondition> results;
-        String searchSubject = (subject != null && !subject.startsWith("Patient/")) ? "Patient/" + subject : subject;
-
-        if (subject != null && code != null) {
-            results = repository.findBySubjectIdAndCode(searchSubject, code);
-        } else if (subject != null) {
-            results = repository.findBySubjectId(searchSubject);
-        } else {
-            results = repository.findByCode(code);
+        if (subject != null && !subject.isEmpty()) {
+            String searchSubject = subject.startsWith("Patient/") ? subject : "Patient/" + subject;
+            query.addCriteria(Criteria.where("subjectId").is(searchSubject));
         }
+
+        if (code != null && !code.isEmpty()) {
+            query.addCriteria(Criteria.where("code").is(code));
+        }
+
+        if (query.getQueryObject().isEmpty()) {
+            if (offset == 0 && count <= 0)
+                return Collections.emptyList();
+        }
+
+        int limit = (count > 0) ? count : 10;
+        int skip = (offset >= 0) ? offset : 0;
+
+        Pageable pageable = PageRequest.of(skip / limit, limit);
+        query.with(pageable);
+
+        List<MongoCondition> results = mongoTemplate.find(query, MongoCondition.class);
 
         return results.stream()
                 .map(mc -> {
                     Condition c = ctx.newJsonParser().parseResource(Condition.class, mc.getFhirJson());
-                    c.setId(mc.getId());
+                    if (c.getId() == null || c.getId().isEmpty()) {
+                        c.setId(mc.getId());
+                    }
                     return c;
                 })
                 .collect(Collectors.toList());

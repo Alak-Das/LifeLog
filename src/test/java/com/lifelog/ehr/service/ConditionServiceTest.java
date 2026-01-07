@@ -41,6 +41,7 @@ public class ConditionServiceTest {
     @Test
     public void testCreateCondition() {
         Condition cond = new Condition();
+        cond.setId("cond-1");
         cond.setSubject(new Reference("Patient/123"));
         cond.getCode().addCoding().setCode("E11"); // Diabetes
 
@@ -57,14 +58,20 @@ public class ConditionServiceTest {
         verify(repository).save(any(MongoCondition.class));
     }
 
+    @Mock
+    private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+
     @Test
     public void testSearchByCode() {
         MongoCondition mc = new MongoCondition("cond-1", "{\"resourceType\":\"Condition\", \"id\":\"cond-1\"}");
-        when(repository.findByCode("E11")).thenReturn(List.of(mc));
 
-        List<Condition> results = service.searchConditions(null, "E11");
+        when(mongoTemplate.find(any(org.springframework.data.mongodb.core.query.Query.class), eq(MongoCondition.class)))
+                .thenReturn(List.of(mc));
+
+        List<Condition> results = service.searchConditions(null, "E11", 0, 10);
 
         assertEquals(1, results.size());
-        verify(repository).findByCode("E11");
+        verify(mongoTemplate).find(any(org.springframework.data.mongodb.core.query.Query.class),
+                eq(MongoCondition.class));
     }
 }

@@ -40,8 +40,15 @@ public class MedicationRequestResourceProvider implements IResourceProvider {
 
     @Search
     public List<MedicationRequest> search(
-            @OptionalParam(name = MedicationRequest.SP_SUBJECT) ReferenceParam subject) {
+            @OptionalParam(name = MedicationRequest.SP_SUBJECT) ReferenceParam subject,
+            @OptionalParam(name = "_count") ca.uhn.fhir.rest.param.NumberParam count,
+            @OptionalParam(name = "_offset") ca.uhn.fhir.rest.param.NumberParam offset) {
+
         String subjectId = (subject != null) ? subject.getIdPart() : null;
-        return service.searchMedicationRequests(subjectId);
+
+        int countVal = (count != null) ? count.getValue().intValue() : 10;
+        int offsetVal = (offset != null) ? offset.getValue().intValue() : 0;
+
+        return service.searchMedicationRequests(subjectId, offsetVal, countVal);
     }
 }

@@ -9,8 +9,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuditService {
 
+    private final AuditLogRepository auditLogRepository;
+
     @Autowired
-    private AuditLogRepository auditLogRepository;
+    public AuditService(AuditLogRepository auditLogRepository) {
+        this.auditLogRepository = auditLogRepository;
+    }
 
     @Async
     public void saveAuditLog(AuditLog log) {

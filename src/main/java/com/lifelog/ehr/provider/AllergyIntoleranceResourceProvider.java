@@ -40,8 +40,15 @@ public class AllergyIntoleranceResourceProvider implements IResourceProvider {
 
     @Search
     public List<AllergyIntolerance> search(
-            @OptionalParam(name = AllergyIntolerance.SP_PATIENT) ReferenceParam patient) {
+            @OptionalParam(name = AllergyIntolerance.SP_PATIENT) ReferenceParam patient,
+            @OptionalParam(name = "_count") ca.uhn.fhir.rest.param.NumberParam count,
+            @OptionalParam(name = "_offset") ca.uhn.fhir.rest.param.NumberParam offset) {
+
         String patientId = (patient != null) ? patient.getIdPart() : null;
-        return service.searchAllergyIntolerances(patientId);
+
+        int countVal = (count != null) ? count.getValue().intValue() : 10;
+        int offsetVal = (offset != null) ? offset.getValue().intValue() : 0;
+
+        return service.searchAllergyIntolerances(patientId, offsetVal, countVal);
     }
 }

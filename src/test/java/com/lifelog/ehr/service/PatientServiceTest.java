@@ -42,6 +42,7 @@ public class PatientServiceTest {
     public void testCreatePatient_ShouldIndexFields() {
         // Setup
         Patient patient = new Patient();
+        patient.setId("123");
         patient.addName().setFamily("Doe").addGiven("John");
         patient.setGender(AdministrativeGender.MALE);
 
@@ -67,27 +68,26 @@ public class PatientServiceTest {
         verify(repository).save(any(MongoPatient.class));
     }
 
+    @Mock
+    private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+
     @Test
-    public void testSearchPatient_ByName_ShouldCallRepository() {
+    public void testSearchPatient_ByName_ShouldCallMongoTemplate() {
         // Setup
         String name = "Doe";
         MongoPatient mp = new MongoPatient("123", "{\"resourceType\":\"Patient\",\"id\":\"123\"}");
         int offset = 0;
         int count = 10;
 
-        org.springframework.data.domain.Page<MongoPatient> page = new org.springframework.data.domain.PageImpl<>(
-                List.of(mp));
-
-        when(repository.findByFamilyRegexIgnoreCaseOrGivenRegexIgnoreCase(eq(name), eq(name),
-                any(org.springframework.data.domain.Pageable.class)))
-                .thenReturn(page);
+        when(mongoTemplate.find(any(org.springframework.data.mongodb.core.query.Query.class), eq(MongoPatient.class)))
+                .thenReturn(List.of(mp));
 
         // Execute
         List<Patient> results = service.searchPatients(name, null, offset, count);
 
         // Verify
         assertEquals(1, results.size());
-        verify(repository).findByFamilyRegexIgnoreCaseOrGivenRegexIgnoreCase(eq(name), eq(name),
-                any(org.springframework.data.domain.Pageable.class));
+        verify(mongoTemplate).find(any(org.springframework.data.mongodb.core.query.Query.class),
+                eq(MongoPatient.class));
     }
 }

@@ -6,37 +6,53 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
 import org.hl7.fhir.r4.model.Patient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import java.util.Optional;
 
 @Service
 public class PatientService {
 
-    @Autowired
-    private PatientRepository repository;
+    private final PatientRepository repository;
+    private final StringRedisTemplate redisTemplate;
+    private final FhirContext ctx;
+    private final MongoTemplate mongoTemplate;
 
     @Autowired
-    private StringRedisTemplate redisTemplate;
-
-    @Autowired
-    private FhirContext ctx;
+    public PatientService(PatientRepository repository,
+            StringRedisTemplate redisTemplate,
+            FhirContext ctx,
+            MongoTemplate mongoTemplate) {
+        this.repository = repository;
+        this.redisTemplate = redisTemplate;
+        this.ctx = ctx;
+        this.mongoTemplate = mongoTemplate;
+    }
 
     public Patient createPatient(Patient patient) {
-        IParser parser = ctx.newJsonParser();
-        String json = parser.encodeResourceToString(patient);
-
-        MongoPatient mongoPatient = new MongoPatient();
+        // 1. Generate ID if missing
+        String id;
         if (patient.hasIdElement() && !patient.getIdElement().isEmpty()) {
-            mongoPatient.setId(patient.getIdElement().getIdPart());
+            id = patient.getIdElement().getIdPart();
+        } else {
+            id = UUID.randomUUID().toString();
+            patient.setId(id);
         }
+
+        // 2. Prepare Mongo Document
+        MongoPatient mongoPatient = new MongoPatient();
+        mongoPatient.setId(id);
 
         // Populate Index Fields
         if (patient.hasName()) {
@@ -44,7 +60,6 @@ public class PatientService {
                 mongoPatient.setFamily(patient.getNameFirstRep().getFamily());
             }
             if (patient.getNameFirstRep().hasGiven()) {
-                // Just grab the first given name for simple indexing
                 mongoPatient.setGiven(patient.getNameFirstRep().getGivenAsSingleString());
             }
         }
@@ -52,14 +67,16 @@ public class PatientService {
             mongoPatient.setGender(patient.getGender().toCode());
         }
 
+        // 3. Serialize with ID included
+        IParser parser = ctx.newJsonParser();
+        String json = parser.encodeResourceToString(patient);
         mongoPatient.setFhirJson(json);
-        mongoPatient = repository.save(mongoPatient);
 
-        // Update ID in the FHIR object and cache it
-        patient.setId(mongoPatient.getId());
-        String finalJson = ctx.newJsonParser().encodeResourceToString(patient);
+        // 4. Save
+        repository.save(mongoPatient);
 
-        redisTemplate.opsForValue().set("patient:" + mongoPatient.getId(), finalJson, Duration.ofMinutes(10));
+        // 5. Cache
+        redisTemplate.opsForValue().set("patient:" + id, json, Duration.ofMinutes(10));
 
         return patient;
     }
@@ -73,30 +90,47 @@ public class PatientService {
         Optional<MongoPatient> result = repository.findById(id);
         if (result.isPresent()) {
             Patient p = ctx.newJsonParser().parseResource(Patient.class, result.get().getFhirJson());
-            p.setId(id);
-            String jsonWithId = ctx.newJsonParser().encodeResourceToString(p);
-            redisTemplate.opsForValue().set("patient:" + id, jsonWithId, Duration.ofMinutes(10));
+            // Double check ID
+            if (!p.hasId()) {
+                p.setId(id);
+            }
+
+            // Re-cache if needed (though now we store correct JSON)
+            String json = ctx.newJsonParser().encodeResourceToString(p);
+            redisTemplate.opsForValue().set("patient:" + id, json, Duration.ofMinutes(10));
             return p;
         }
         return null;
     }
 
     public List<Patient> searchPatients(String name, String gender, int offset, int count) {
-        Page<MongoPatient> pageResult;
-        Pageable pageable = PageRequest.of(offset / count, count);
+        Query query = new Query();
 
-        if (name != null) {
-            pageResult = repository.findByFamilyRegexIgnoreCaseOrGivenRegexIgnoreCase(name, name, pageable);
-        } else if (gender != null) {
-            pageResult = repository.findByGender(gender, pageable);
-        } else {
-            pageResult = repository.findAll(pageable);
+        if (name != null && !name.isEmpty()) {
+            // Search in family OR given
+            Criteria nameCriteria = new Criteria().orOperator(
+                    Criteria.where("family").regex(name, "i"),
+                    Criteria.where("given").regex(name, "i"));
+            query.addCriteria(nameCriteria);
         }
 
-        return pageResult.stream()
+        if (gender != null && !gender.isEmpty()) {
+            query.addCriteria(Criteria.where("gender").is(gender));
+        }
+
+        // Pagination
+        Pageable pageable = PageRequest.of(offset / count, count);
+        query.with(pageable);
+
+        List<MongoPatient> results = mongoTemplate.find(query, MongoPatient.class);
+
+        return results.stream()
                 .map(mp -> {
                     Patient p = ctx.newJsonParser().parseResource(Patient.class, mp.getFhirJson());
-                    p.setId(mp.getId());
+                    // Ensure runtime ID is set if absent in JSON (legacy data support)
+                    if (p.getId() == null || p.getId().isEmpty()) {
+                        p.setId(mp.getId());
+                    }
                     return p;
                 })
                 .collect(Collectors.toList());

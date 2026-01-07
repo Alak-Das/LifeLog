@@ -40,8 +40,15 @@ public class AppointmentResourceProvider implements IResourceProvider {
 
     @Search
     public List<Appointment> search(
-            @OptionalParam(name = Appointment.SP_ACTOR) ReferenceParam actor) {
+            @OptionalParam(name = Appointment.SP_ACTOR) ReferenceParam actor,
+            @OptionalParam(name = "_count") ca.uhn.fhir.rest.param.NumberParam count,
+            @OptionalParam(name = "_offset") ca.uhn.fhir.rest.param.NumberParam offset) {
+
         String patientId = (actor != null) ? actor.getIdPart() : null;
-        return service.searchAppointments(patientId);
+
+        int countVal = (count != null) ? count.getValue().intValue() : 10;
+        int offsetVal = (offset != null) ? offset.getValue().intValue() : 0;
+
+        return service.searchAppointments(patientId, offsetVal, countVal);
     }
 }

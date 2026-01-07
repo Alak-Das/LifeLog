@@ -41,6 +41,7 @@ public class EncounterServiceTest {
     @Test
     public void testCreateEncounter() {
         Encounter enc = new Encounter();
+        enc.setId("enc-1");
         enc.setSubject(new Reference("Patient/123"));
 
         when(repository.save(any(MongoEncounter.class))).thenAnswer(i -> {
@@ -56,14 +57,20 @@ public class EncounterServiceTest {
         verify(repository).save(any(MongoEncounter.class));
     }
 
+    @Mock
+    private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+
     @Test
     public void testSearchEncounter() {
         MongoEncounter me = new MongoEncounter("enc-1", "{\"resourceType\":\"Encounter\", \"id\":\"enc-1\"}");
-        when(repository.findBySubjectId("Patient/123")).thenReturn(List.of(me));
 
-        List<Encounter> results = service.searchEncounters("Patient/123");
+        when(mongoTemplate.find(any(org.springframework.data.mongodb.core.query.Query.class), eq(MongoEncounter.class)))
+                .thenReturn(List.of(me));
+
+        List<Encounter> results = service.searchEncounters("Patient/123", 0, 10);
 
         assertEquals(1, results.size());
-        verify(repository).findBySubjectId("Patient/123");
+        verify(mongoTemplate).find(any(org.springframework.data.mongodb.core.query.Query.class),
+                eq(MongoEncounter.class));
     }
 }

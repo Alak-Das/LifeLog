@@ -39,8 +39,16 @@ public class EncounterResourceProvider implements IResourceProvider {
     }
 
     @Search
-    public List<Encounter> search(@OptionalParam(name = Encounter.SP_SUBJECT) ReferenceParam subject) {
+    public List<Encounter> search(
+            @OptionalParam(name = Encounter.SP_SUBJECT) ReferenceParam subject,
+            @OptionalParam(name = "_count") ca.uhn.fhir.rest.param.NumberParam count,
+            @OptionalParam(name = "_offset") ca.uhn.fhir.rest.param.NumberParam offset) {
+
         String subjectVal = (subject != null) ? subject.getIdPart() : null;
-        return encounterService.searchEncounters(subjectVal);
+
+        int countVal = (count != null) ? count.getValue().intValue() : 10;
+        int offsetVal = (offset != null) ? offset.getValue().intValue() : 0;
+
+        return encounterService.searchEncounters(subjectVal, offsetVal, countVal);
     }
 }

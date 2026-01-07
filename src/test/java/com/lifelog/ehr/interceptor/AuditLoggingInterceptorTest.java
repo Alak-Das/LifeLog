@@ -23,7 +23,11 @@ import static org.mockito.Mockito.*;
 public class AuditLoggingInterceptorTest {
 
     @Mock
-    private AuditLogRepository auditLogRepository;
+    private com.lifelog.ehr.service.AuditService auditService;
+
+    // Remove AuditLogRepository mock as it's not used directly
+    // @Mock
+    // private AuditLogRepository auditLogRepository;
 
     @Mock
     private RequestDetails requestDetails;
@@ -64,6 +68,6 @@ public class AuditLoggingInterceptorTest {
         interceptor.logRequest(requestDetails, servletRequest, servletResponse);
 
         // Verify
-        verify(auditLogRepository).save(any(AuditLog.class));
+        verify(auditService).saveAuditLog(any(AuditLog.class));
     }
 }
