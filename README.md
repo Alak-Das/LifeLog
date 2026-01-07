@@ -217,31 +217,53 @@ java -jar target/lifelog-ehr-0.0.1-SNAPSHOT.jar
 > [!TIP]
 > All resources support `_format=json` and `_pretty=true` parameters.
 
-### Clinical Resources
-
-| Resource | Methods | Key Params | Description |
+### 1. Patient Scenarios (Role: **Admin**)
+| Method | Endpoint | Params | Description |
 | :--- | :--- | :--- | :--- |
-| **[Observation](http://hl7.org/fhir/R4/observation.html)** | `POST`, `GET`, `PUT` | `subject`, `code`, `date`, `subject.name` | Vitals, Lab Results. |
-| **[Condition](http://hl7.org/fhir/R4/condition.html)** | `POST`, `GET` | `subject`, `clinical-status` | Diagnoses (e.g., Diabetes). |
-| **[Encounter](http://hl7.org/fhir/R4/encounter.html)** | `POST`, `GET` | `subject`, `date` | Visits/Admissions. |
-| **[AllergyIntolerance](http://hl7.org/fhir/R4/allergyintolerance.html)** | `POST`, `GET` | `patient` | Active Allergies. |
-| **[Immunization](http://hl7.org/fhir/R4/immunization.html)** | `POST`, `GET` | `patient` | Vaccination history. |
+| `POST` | `/Patient` | N/A | Create a new patient. |
+| `GET` | `/Patient/{id}` | N/A | Read patient details. |
+| `GET` | `/Patient` | `name`, `gender`, `_id` | Search patients. |
+| `GET` | `/Patient` | `_revinclude=Observation:patient` | Search with reverse include (include Observations). |
+| `PUT` | `/Patient/{id}` | N/A | Update patient record. |
+| `DELETE` | `/Patient/{id}` | N/A | Delete patient record. |
+| `GET` | `/Patient/{id}/_history` | N/A | Retrieve version history of a patient. |
 
-### Administrative Resources
-
-| Resource | Methods | Key Params | Description |
+### 2. Clinical Resources (Role: **Clinical**)
+| Resource | Method | Endpoint | Supported Params |
 | :--- | :--- | :--- | :--- |
-| **[Patient](http://hl7.org/fhir/R4/patient.html)** | `CRU_`, `Search` | `name`, `gender`, `_id` | Patient Demographics. |
-| **[Practitioner](http://hl7.org/fhir/R4/practitioner.html)** | `POST`, `GET` | `name` | Doctors/Nurses. |
-| **[organization](http://hl7.org/fhir/R4/organization.html)** | `POST`, `GET` | `name` | Hospital Departments. |
+| **Observation** | `POST` | `/Observation` | N/A |
+| | `GET` | `/Observation` | `subject`, `subject.name`, `date` (supports prefixes `gt`, `lt`), `category` |
+| **Condition** | `POST` | `/Condition` | N/A |
+| | `GET` | `/Condition` | `subject`, `clinical-status` |
+| **Encounter** | `POST` | `/Encounter` | N/A |
+| | `GET` | `/Encounter` | `subject`, `date` |
+| **AllergyIntolerance** | `POST` | `/AllergyIntolerance` | N/A |
+| | `GET` | `/AllergyIntolerance` | `patient` |
+| **MedicationRequest** | `POST` | `/MedicationRequest` | N/A |
+| | `GET` | `/MedicationRequest` | `subject`, `status` |
+| **Immunization** | `POST` | `/Immunization` | N/A |
+| | `GET` | `/Immunization` | `patient`, `date` |
+| **DiagnosticReport** | `POST` | `/DiagnosticReport` | N/A |
+| | `GET` | `/DiagnosticReport` | `subject`, `status` |
 
-### System Endpoints
+### 3. Administrative Resources (Role: **Admin**)
+| Resource | Method | Endpoint | Description |
+| :--- | :--- | :--- | :--- |
+| **Practitioner** | `POST` | `/Practitioner` | Register a new healthcare professional. |
+| | `GET` | `/Practitioner` | Search by `name`. |
+| **Organization** | `POST` | `/Organization` | Register a healthcare organization. |
+| | `GET` | `/Organization` | Search by `name`. |
+| **Appointment** | `POST` | `/Appointment` | Schedule an appointment. |
+| | `GET` | `/Appointment` | Search by `actor` (patient/practitioner). |
+| **Subscription** | `POST` | `/Subscription` | Register a webhook subscription. |
 
-| Endpoint | Method | Purpose |
+### 4. System & Metadata (Public)
+| Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `/metadata` | `GET` | **CapabilityStatement**: Server capabilities. |
-| `/actuator/prometheus` | `GET` | Metrics for Grafana. |
-| `/actuator/health` | `GET` | Kubernetes Liveness Probe. |
+| `GET` | `/metadata` | **CapabilityStatement**: Server capabilities & conformance. |
+| `GET` | `/.well-known/smart-configuration` | **SMART Configuration**: OAuth2 endpoints (future use). |
+| `GET` | `/actuator/health` | **Health Check**: Kubernetes Liveness Probe. |
+| `GET` | `/actuator/prometheus` | **Metrics**: Prometheus scraper endpoint. |
 
 ---
 
