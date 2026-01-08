@@ -68,15 +68,15 @@ Unlike traditional SQL-based EHRs, LifeLog leverages **MongoDB** to natively sto
 
 | Category | Role | Username | Permissions |
 | :--- | :--- | :--- | :--- |
-| **Clinical** | `physician` | `physician` | Full Clinical Write, Diagnostic Read |
-| | `nurse` | `nurse` | Vitals Write, Med/Encounter/Condition Read |
+| **Clinical** | `physician` | `physician` | Full Clinical Write, Diagnostic Read, Patient Read |
+| | `nurse` | `nurse` | Observation Write, Med/Encounter/Condition Read |
 | | `pharmacist` | `pharmacist` | Medication/Allergy/Patient Read |
-| | `lab_tech` | `lab_tech` | Diagnostic Write, Observation Write |
-| **Admin** | `registrar` | `registrar` | Patient Write, Appointment Write |
-| | `scheduler` | `scheduler` | Appointment Write, Schedule Write |
+| | `lab_tech` | `lab_tech` | Diagnostic Write, Observation Write, Orders Read |
+| **Admin** | `registrar` | `registrar` | Patient Write, Appointment Write, Coverage Write |
+| | `scheduler` | `scheduler` | Appointment/Schedule Write, Practitioner Read |
 | | `biller` | `biller` | Account/Claim Write, Clinical Read |
 | | `practice_mgr`| `practice_mgr`| Org/Practitioner/Location Write |
-| **System** | `sys_admin` | `sys_admin` | Subscriptions, System Settings |
+| **System** | `sys_admin` | `sys_admin` | Subscriptions, System Config |
 | | `auditor` | `auditor` | Audit Trail Read |
 | | `integrator` | `integrator` | Observation Write |
 | | `patient` | `patient_user`| Patient Self-Read |
@@ -220,6 +220,16 @@ mvn clean install
 java -jar target/lifelog-ehr-0.0.1-SNAPSHOT.jar
 ```
 
+### ✅ Verification
+After starting the server, you can verify the Role-Based Access Control (RBAC) configuration using the included PowerShell script. This script tests various endpoints with different user roles to ensure permissions are correctly enforced.
+
+```powershell
+./verify_rbac.ps1
+```
+*   **Green Output**: Test Passed (Access granted/denied as expected).
+*   **Red Output**: Test Failed.
+*   **Cyan Output**: Section headers.
+
 ---
 
 ## 📚 API Reference
@@ -309,12 +319,15 @@ Ensure the `mongo` container is healthy. If running locally (not Docker), change
 ### Project Structure
 ```
 src/main/java/com/al/lifelog/
-├── config/           # App Configuration (Beans)
-├── interceptor/      # AOP (Audit, Auth)
-├── model/            # Mongo Documents
-├── provider/         # FHIR Controllers
-├── repository/       # DB Access
-├── service/          # Business Logic
+├── config/           # App Configuration (SecurityConfig, FhirConfig)
+├── interceptor/      # AOP Interceptors (Audit, Validation)
+├── model/            # Mongo Documents & DTOs
+├── provider/         # FHIR Resource Providers (Controllers)
+├── repository/       # Spring Data MongoDB Repositories
+├── service/          # Business Logic & Service Layer
+├── tests/
+│   └── postman/      # Integration Tests & Environment Files
+└── docs/             # Architectual Documentation & Security Models
 ```
 
 ### Running Tests
@@ -323,7 +336,7 @@ src/main/java/com/al/lifelog/
 mvn test
 
 # Integration Tests (Requires running server + DB + Redis)
-# Uses Newman (Postman CLI)
+# Uses Newman (Postman CLI). See [tests/postman/README.md](tests/postman/README.md) for details.
 newman run tests/postman/LifeLog_Integration_Tests.postman_collection.json \
   -e tests/postman/LifeLog_Local.postman_environment.json
 ```
