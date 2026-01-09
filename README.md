@@ -18,23 +18,15 @@
 
 ## 📋 Table of Contents
 - [Executive Summary](#-executive-summary)
-- [Key Features](#-key-features)
+- [Business Logic & Capabilities](#-business-logic--capabilities)
+- [Security & Access Control](#-security--access-control)
 - [Architecture & Design](#-architecture--design)
   - [System Architecture](#system-architecture-diagram)
-  - [Request Lifecycle](#-request-lifecycle-sequence)
-  - [Service Responsibilities](#-service-responsibilities)
+  - [Date Persistence & Integrity](#data-persistence--integrity)
 - [Technology Stack](#-technology-stack)
 - [Getting Started](#-getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Quick Start](#quick-start-with-docker)
 - [API Reference](#-api-reference)
-  - [Clinical Resources](#clinical-resources)
-  - [Administrative Resources](#administrative-resources)
-  - [System](#system-endpoints)
 - [Operations Manual](#-operations-manual)
-  - [Configuration](#configuration)
-  - [Observability](#observability)
-  - [Troubleshooting](#troubleshooting)
 - [Developer Guide](#-developer-guide)
 - [Roadmap](#-roadmap)
 
@@ -53,40 +45,58 @@ Unlike traditional SQL-based EHRs, LifeLog leverages **MongoDB** to natively sto
 
 ---
 
-## ✨ Key Features
+## 🩺 Business Logic & Capabilities
 
-### 🩺 Clinical
-*   **Comprehensive Resource Support**: CRUD operations for `Patient`, `Observation`, `Encounter`, `Condition`, `Immunization`, `MedicationRequest`, and more.
-*   **Semantic Validation**: Strictly enforces FHIR R4 structure and cardinality.
-*   **Advanced Search**: Supports chained parameters (e.g., `subject.name`), dates, and token searches.
+### FHIR Resource Management
+The system supports specific Clinical and Administrative modules. Each module implements strict semantic validation against the FHIR R4 specification.
 
-### 🛡️ Security & Compliance
-*   **Audit Trails**: Asynchronous, immutable logging of every data access (`AuditEvent`).
-*   **Optimistic Locking**: Prevents "lost updates" using standard FHIR versioning (`Weak ETag`).
-*   **Authentication**: Basic Auth (**Granular RBAC Enabled**)
-*   **Security Model**: [View Active Role Matrix](docs/SECURITY_MODEL.md)
+| Module | Resource Type | Key Business Rules |
+| :--- | :--- | :--- |
+| **Patient Administration** | `Patient` | **Write**: Restricted to Registrars.<br>**Read**: Clinical staff.<br>**Search**: Token/String search on Name, Gender.<br>**Versioning**: Full history maintained. |
+| **Clinical Observations** | `Observation` | **High Volume**: Optimized for IoMT ingestion.<br>**Caching**: Aggressive caching (10 min TTL).<br>**Notifications**: Triggers `Subscription` webhooks on create. |
+| **Encounters & Visits** | `Encounter` | Links interactions between Patient and Practitioner.<br>**Integrity**: Must reference valid Patient/Practitioner IDs. |
+| **Conditions (Diagnosis)** | `Condition` | Tracks current and historical problems.<br>**Security**: Sensitive access (Physician/Nurse/Biller only). |
+| **Medications** | `MedicationRequest` | **Prescribing**: Restricted to Physicians.<br>**Dispensing**: Visible to Pharmacists. |
+| **Diagnostics** | `DiagnosticReport` | Lab results integration.<br>**Write**: Restricted to Lab Techs. |
+| **Scheduling** | `Appointment` | **Self-Service**: Patients can book (create) own appointments.<br>**Management**: Schedulers manage slots. |
 
-| Category | Role | Username | Permissions |
-| :--- | :--- | :--- | :--- |
-| **Clinical** | `physician` | `physician` | Full Clinical Write, Diagnostic Read, Patient Read |
-| | `nurse` | `nurse` | Observation Write, Med/Encounter/Condition Read |
-| | `pharmacist` | `pharmacist` | Medication/Allergy/Patient Read |
-| | `lab_tech` | `lab_tech` | Diagnostic Write, Observation Write, Orders Read |
-| **Admin** | `registrar` | `registrar` | Patient Write, Appointment Write, Coverage Write |
-| | `scheduler` | `scheduler` | Appointment/Schedule Write, Practitioner Read |
-| | `biller` | `biller` | Account/Claim Write, Clinical Read |
-| | `practice_mgr`| `practice_mgr`| Org/Practitioner/Location Write |
-| **System** | `sys_admin` | `sys_admin` | Subscriptions, System Config |
-| | `auditor` | `auditor` | Audit Trail Read |
-| | `integrator` | `integrator` | Observation Write |
-| | `patient` | `patient_user`| Patient Self-Read |
-*   **Password**: Default is `password` for all users.
-*   **Input Sanitization**: Rejects malformed or unrecognized data structures.
+---
 
-### 🚀 Technical
-*   **Event-Driven Architecture**: Non-blocking **Webhooks** (`Subscription`) for real-time integrations.
-*   **Write-Through Caching**: **Redis** layer for sub-millisecond read latency on hot data.
-*   **Scalable**: Stateless architecture ready for container orchestration (Kubernetes).
+## 🛡️ Security & Access Control
+
+The system uses a **Maximum Granularity** authority model. Users are not checked for "Roles" (e.g. `PHYSICIAN`) in the code, but for "Authorities" (e.g. `OBSERVATION_WRITE`). This allows purely configuration-based role changes without code refactoring.
+
+### Active Role-Authority Matrix
+
+#### Clinical Roles
+| Role | Username | Authorities (Capabilities) |
+| :--- | :--- | :--- |
+| **Physician** | `physician` | `PATIENT_READ`, `OBSERVATION_WRITE`, `CONDITION_WRITE`, `ENCOUNTER_WRITE`, `MEDICATION_WRITE`, `ALLERGY_WRITE`, `IMMUNIZATION_WRITE`, `DIAGNOSTIC_READ` |
+| **Nurse** | `nurse` | `PATIENT_READ`, `OBSERVATION_WRITE`, `CONDITION_READ`, `ENCOUNTER_READ`, `IMMUNIZATION_WRITE`, `MEDICATION_READ` |
+| **Pharmacist** | `pharmacist` | `PATIENT_READ`, `MEDICATION_READ`, `ALLERGY_READ` |
+| **Lab Tech** | `lab_tech` | `SERVICE_ORDER_READ`, `DIAGNOSTIC_WRITE`, `OBSERVATION_WRITE` |
+
+#### Administrative Roles
+| Role | Username | Authorities (Capabilities) |
+| :--- | :--- | :--- |
+| **Registrar** | `registrar` | `PATIENT_WRITE` (Create/Update), `APPOINTMENT_WRITE`, `COVERAGE_WRITE` |
+| **Scheduler** | `scheduler` | `APPOINTMENT_WRITE`, `SCHEDULE_WRITE`, `PRACTITIONER_READ` |
+| **Biller** | `biller` | `ENCOUNTER_READ`, `CONDITION_READ`, `ACCOUNT_WRITE` |
+| **Practice Mgr** | `practice_mgr` | `PRACTITIONER_WRITE`, `ORGANIZATION_WRITE`, `LOCATION_WRITE` |
+
+#### System Roles
+| Role | Username | Authorities (Capabilities) |
+| :--- | :--- | :--- |
+| **SysAdmin** | `sys_admin` | `SUBSCRIPTION_WRITE`, `SYSTEM_CONFIG_WRITE` |
+| **Auditor** | `auditor` | `AUDIT_READ` (ReadOnly access to Audit Logs) |
+| **Integrator** | `integrator` | `OBSERVATION_WRITE` (Headless IoMT ingestion) |
+| **Patient** | `patient_user` | `PATIENT_SELF_READ` (Access to own record only) |
+
+### Audit Logging
+*   **Secure & Immutable**: Every Write (Create/Update/Delete) and specific Reads are logged.
+*   **Storage**: `audit_event` collection in MongoDB.
+*   **Fields Logged**: Timestamp, User ID, Resource Type, Resource ID, Operation, Outcome.
+*   **Access**: strictly limited to `AUDITOR` role.
 
 ---
 
@@ -135,44 +145,25 @@ graph TD
     SubAsync -.->|HTTP Webhook| External[External Systems]
 ```
 
-### 🔄 Request Lifecycle (Sequence)
+### Data Persistence & Integrity
+*   **Optimistic Locking**: The system implements standard FHIR Versioning.
+    *   Every update requires a version check. If the client sends `If-Match: W/"2"` and the current server version is `3`, the request fails with `412 Precondition Failed`.
+    *   **Goal**: prevents "lost updates" when multiple clinicians edit a record simultaneously.
+*   **Versioning**:
+    *   Every update creates a historical copy in the `_history` collection.
+    *   Accessible via `GET /{Resource}/{id}/_history`.
 
-How a **POST /Observation** moves through the system:
+### Caching Strategy (Redis)
+*   **Pattern**: Cache-Aside / Write-Through.
+*   **TTL**: 10 Minutes default.
+*   **Invalidation**:
+    *   **Update/Delete**: Immediately invalidates the cache key to ensure consistency.
+    *   **Search**: Searches always hit the primary database (MongoDB) to ensure accuracy, they are *not* cached.
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Provider as ObservationProvider
-    participant Service as ObservationService
-    participant DB as MongoDB
-    participant Cache as Redis
-    participant Async as AsyncExecutor
-
-    Client->>Provider: POST /Observation (JSON)
-    Provider->>Provider: Validate HTTP/Auth
-    Provider->>Service: createObservation(DTO)
-    Service->>Service: Generate ID & Version
-    Service->>DB: Save(MongoObservation)
-    Service->>Cache: Set("observation:id", JSON)
-    Service->>Async: Fire Events (Audit, Subscription)
-    
-    par Async Tasks
-        Async->>DB: Save(AuditLog)
-        Async->>Client: Webhook Notification (if Subscribed)
-    end
-    
-    Service-->>Provider: Return Created Object
-    Provider-->>Client: 201 Created (Location Header)
-```
-
-### 🧠 Service Responsibilities
-
-| Service | Responsibility | Key Interactions |
-| :--- | :--- | :--- |
-| **PatientService** | Identity Management | Indexed search by Name/Gender. |
-| **ObservationService** | Clinical Data Management | High-volume writes, Redis Caching. |
-| **SubscriptionService** | Webhooks | Matches `Criteria` (e.g., `code=123`) -> POST to URL. |
-| **AuditService** | Compliance | Asynchronous reliable logging. |
+### Event Driven Architecture
+*   **Subscriptions**: The system supports FHIR `Subscription` resources (REST Hook).
+*   **Trigger**: When a resource is Created/Updated, the `SubscriptionService` evaluates active subscriptions.
+*   **Delivery**: Asynchronous POST request to the subscriber's endpoint.
 
 ---
 
@@ -226,9 +217,6 @@ After starting the server, you can verify the Role-Based Access Control (RBAC) c
 ```powershell
 ./verify_rbac.ps1
 ```
-*   **Green Output**: Test Passed (Access granted/denied as expected).
-*   **Red Output**: Test Failed.
-*   **Cyan Output**: Section headers.
 
 ---
 
@@ -245,65 +233,59 @@ After starting the server, you can verify the Role-Based Access Control (RBAC) c
 | `POST` | `/Patient` | N/A | Create a new patient. |
 | `GET` | `/Patient/{id}` | N/A | Read patient details. |
 | `GET` | `/Patient` | `name`, `gender`, `_id` | Search patients. |
-| `GET` | `/Patient` | `_include=Patient:observation` | Search with forward include (include Observations). |
-| `GET` | `/Patient` | `_revinclude=Observation:patient` | Search with reverse include (include Observations). |
 | `PUT` | `/Patient/{id}` | N/A | Update patient record. |
 | `DELETE` | `/Patient/{id}` | N/A | Delete patient record. |
-| `GET` | `/Patient/{id}/_history` | N/A | Retrieve version history of a patient. |
+| `GET` | `/Patient/{id}/_history` | N/A | Retrieve version history. |
 
 ### 2. Clinical Resources (Role: **Clinical**)
 | Resource | Methods | Endpoint | Supported Search Params |
 | :--- | :--- | :--- | :--- |
-| **Observation** | `GET`, `POST`, `PUT`, `DELETE`, `History` | `/Observation` | `subject`, `subject.name`, `code`, `date`, `_include=Observation:patient` |
-| **Condition** | `GET`, `POST`, `PUT`, `DELETE`, `History` | `/Condition` | `subject`, `code` |
-| **Encounter** | `GET`, `POST`, `PUT`, `DELETE`, `History` | `/Encounter` | `subject`, `date` |
+| **Observation** | `GET`, `POST`, `PUT`, `DELETE` | `/Observation` | `subject`, `code`, `date` |
+| **Condition** | `GET`, `POST`, `PUT`, `DELETE` | `/Condition` | `subject`, `code` |
+| **Encounter** | `GET`, `POST`, `PUT`, `DELETE` | `/Encounter` | `subject`, `date` |
 | **AllergyIntolerance**| `GET`, `POST` | `/AllergyIntolerance` | `patient` |
 | **MedicationRequest** | `GET`, `POST` | `/MedicationRequest` | `subject` |
-| **Immunization** | `GET`, `POST` | `/Immunization` | `patient`, `vaccine-code` |
 | **DiagnosticReport** | `GET`, `POST` | `/DiagnosticReport` | `subject`, `code` |
 
 ### 3. Administrative Resources (Role: **Admin**)
-| Resource | Methods | Endpoint | Supported Search Params |
-| :--- | :--- | :--- | :--- |
-| **Practitioner** | `GET`, `POST` | `/Practitioner` | `name` |
-| **Organization** | `GET`, `POST` | `/Organization` | `name` |
-| **Appointment** | `GET`, `POST` | `/Appointment` | `actor` |
-| **Subscription** | `POST`, `DELETE` | `/Subscription` | N/A (Webhooks) |
-
-### 4. System & Metadata (Public)
-| Method | Endpoint | Description |
+| Resource | Methods | Endpoint |
 | :--- | :--- | :--- |
-| `GET` | `/metadata` | **CapabilityStatement**: Server capabilities & conformance. |
-| `GET` | `/.well-known/smart-configuration` | **SMART Configuration**: OAuth2 endpoints. |
-| `GET` | `/actuator/health` | **Health Check**: Kubernetes Liveness Probe. |
-| `GET` | `/actuator/prometheus` | **Metrics**: Prometheus scraper endpoint. |
+| **Practitioner** | `GET`, `POST` | `/Practitioner` |
+| **Organization** | `GET`, `POST` | `/Organization` |
+| **Appointment** | `GET`, `POST` | `/Appointment` |
+| **Subscription** | `POST`, `DELETE` | `/Subscription` |
 
 ---
 
 ## ⚙️ Operations Manual
 
 ### Configuration
-Key environment variables in `application.yml` (overridable via OS env):
+Key environment variables in `application.yml`:
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `SPRING_DATA_MONGODB_URI` | Mongo Connection String | `mongodb://localhost:27017/lifelog` |
 | `SPRING_REDIS_HOST` | Redis Server Host | `localhost` |
 | `SERVER_PORT` | Application HTTP Port | `8080` |
-| `SPRING_SECURITY_USERS_PHYSICIAN_PASSWORD` | Physician Role Password | `password` |
-| `SPRING_SECURITY_USERS_SYS_ADMIN_PASSWORD` | SysAdmin Role Password | `password` |
-| `...` | (See `application.yml` for all roles) | `...` |
 
 ### Observability
 *   **Metrics**: Prometheus scraper available at `/actuator/prometheus`.
 *   **Logging**: STDOUT (Docker Logs).
 
-### Troubleshooting
+### Troubleshooting Common Issues
 
 <details>
-<summary><strong>❌ Port 8080 is already in use</strong></summary>
+<summary><strong>❌ 403 Forbidden</strong></summary>
 
-Stop the conflicting service or change `SERVER_PORT` in `docker-compose.yml` and recreate containers.
+**Cause**: The user role lacks the specific **Authority** for that HTTP Method + Resource.
+**Fix**: Check `SecurityConfig.java` against the user's role. e.g., A `Nurse` cannot *Write* a `MedicationRequest`.
+</details>
+
+<details>
+<summary><strong>❌ 412 Precondition Failed</strong></summary>
+
+**Cause**: Optimistic Locking conflict. Another user updated the record since you read it.
+**Fix**: Re-read the resource to get the latest `versionId`, re-apply changes, and submit again.
 </details>
 
 <details>
@@ -325,26 +307,23 @@ src/main/java/com/al/lifelog/
 ├── provider/         # FHIR Resource Providers (Controllers)
 ├── repository/       # Spring Data MongoDB Repositories
 ├── service/          # Business Logic & Service Layer
-├── tests/
-│   └── postman/      # Integration Tests & Environment Files
-└── docs/             # Architectual Documentation & Security Models
+└── tests/
+    └── postman/      # Integration Tests & Environment Files
 ```
+
+### Adding a New Resource
+1.  **Model**: Create Class extending `DomainResource`. Application `Mongo{Resource}` wrapper.
+2.  **Repo**: Create `CodeRepository` interface.
+3.  **Service**: Implement CRUD logic, Caching, and Auditing calls.
+4.  **Provider**: Extend `IResourceProvider`, expose `@Create`, `@Read`, etc.
+5.  **Config**: Register Provider in `FhirRestfulServerConfig`.
+6.  **Security**: Define authorities in `SecurityConfig`.
 
 ### Running Tests
 ```bash
-# Unit Tests (Fast, no dependencies)
 mvn test
-
-# Integration Tests (Requires running server + DB + Redis)
-# Uses Newman (Postman CLI). See [tests/postman/README.md](tests/postman/README.md) for details.
-newman run tests/postman/LifeLog_Integration_Tests.postman_collection.json \
-  -e tests/postman/LifeLog_Local.postman_environment.json
-```
-
-### Security Verification
-Verify Role-Based Access Control (RBAC) rules:
-```powershell
-./verify_rbac.ps1
+# Integration Tests via Postman
+newman run tests/postman/LifeLog_Integration_Tests.postman_collection.json ...
 ```
 
 ---
