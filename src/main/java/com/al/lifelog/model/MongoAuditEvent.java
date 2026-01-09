@@ -16,7 +16,7 @@ public class MongoAuditEvent {
     @Id
     private String id;
 
-    @Indexed(expireAfterSeconds = 7776000) // Purge after 90 days
+    @Indexed(expireAfter = "90d") // Purge after 90 days
     private Date timestamp;
 
     @Indexed

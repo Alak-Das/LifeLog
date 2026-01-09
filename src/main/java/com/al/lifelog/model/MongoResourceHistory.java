@@ -24,7 +24,7 @@ public class MongoResourceHistory {
 
     private Long versionId;
 
-    @Indexed(expireAfterSeconds = 7776000) // Purge after 90 days
+    @Indexed(expireAfter = "90d") // Purge after 90 days
     private Date lastUpdated;
 
     private String fhirJson;
