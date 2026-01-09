@@ -35,7 +35,6 @@ public class ObservationService {
     private final MongoTemplate mongoTemplate;
     private final HistoryService historyService;
 
-    private final MeterRegistry meterRegistry;
     private final Counter observationCreatedCounter;
     private final SubscriptionService subscriptionService;
 
@@ -52,7 +51,6 @@ public class ObservationService {
         this.ctx = ctx;
         this.mongoTemplate = mongoTemplate;
         this.historyService = historyService;
-        this.meterRegistry = meterRegistry;
         this.subscriptionService = subscriptionService;
         this.observationCreatedCounter = Counter.builder("fhir.observation.created")
                 .description("Total number of observations created")

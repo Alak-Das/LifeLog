@@ -33,7 +33,7 @@ public class PatientService {
     private final FhirContext ctx;
     private final MongoTemplate mongoTemplate;
     private final HistoryService historyService;
-    private final MeterRegistry meterRegistry;
+
     private final Counter patientCreatedCounter;
     private final AuditService auditService;
     private final SubscriptionService subscriptionService;
@@ -53,7 +53,6 @@ public class PatientService {
         this.mongoTemplate = mongoTemplate;
         this.historyService = historyService;
         this.auditService = auditService;
-        this.meterRegistry = meterRegistry;
         this.subscriptionService = subscriptionService;
         this.patientCreatedCounter = Counter.builder("fhir.patient.created")
                 .description("Total number of patients created")
@@ -116,6 +115,7 @@ public class PatientService {
         // 6. Cache
         redisTemplate.opsForValue().set("patient:" + id, json, Duration.ofMinutes(10));
 
+        auditService.log("create", "Patient", id, "Success", null, null);
         return patient;
     }
 
@@ -198,6 +198,7 @@ public class PatientService {
         // Cache
         redisTemplate.opsForValue().set("patient:" + id, json, Duration.ofMinutes(10));
 
+        auditService.log("update", "Patient", id, "Success", null, null);
         return patient;
     }
 
@@ -213,6 +214,8 @@ public class PatientService {
             repository.deleteById(id);
             // Invalidate Cache
             redisTemplate.delete("patient:" + id);
+            // Audit log
+            auditService.log("delete", "Patient", id, "Success", null, null);
             // Optionally: Create a "Deleted" Audit log or keep a "Tombstone" record in a
             // History table
         } else {
@@ -225,6 +228,7 @@ public class PatientService {
     public Patient getPatient(String id) {
         String cached = redisTemplate.opsForValue().get("patient:" + id);
         if (cached != null) {
+            auditService.log("read", "Patient", id, "Success", null, null);
             return ctx.newJsonParser().parseResource(Patient.class, cached);
         }
 
@@ -239,6 +243,7 @@ public class PatientService {
             // Re-cache if needed (though now we store correct JSON)
             String json = ctx.newJsonParser().encodeResourceToString(p);
             redisTemplate.opsForValue().set("patient:" + id, json, Duration.ofMinutes(10));
+            auditService.log("read", "Patient", id, "Success", null, null);
             return p;
         }
         return null;
