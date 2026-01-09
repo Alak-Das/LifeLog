@@ -26,6 +26,7 @@
 - [Technology Stack](#-technology-stack)
 - [Getting Started](#-getting-started)
 - [API Reference](#-api-reference)
+  - [Quick Examples](#quick-examples)
 - [Operations Manual](#-operations-manual)
 - [Developer Guide](#-developer-guide)
 - [Roadmap](#-roadmap)
@@ -165,6 +166,10 @@ graph TD
 *   **Trigger**: When a resource is Created/Updated, the `SubscriptionService` evaluates active subscriptions.
 *   **Delivery**: Asynchronous POST request to the subscriber's endpoint.
 
+### Design Decisions
+*   **Why MongoDB?**: Healthcare data is inherently polymorphic. A document store allows us to save complex FHIR trees (e.g., nested `component` in Observations) without expensive JOINs.
+*   **Why Redis?**: Clinical dashboards often request the same data repeatedly (e.g. loading a patient's chart). Redis cuts latency from ~50ms to <2ms.
+
 ---
 
 ## 💻 Technology Stack
@@ -227,6 +232,37 @@ After starting the server, you can verify the Role-Based Access Control (RBAC) c
 > [!TIP]
 > All resources support `_format=json`, `_pretty=true`, `_count={n}`, and `_offset={n}` parameters.
 
+### Quick Examples
+
+**Create a Patient (Registrar)**
+```bash
+curl -X POST http://localhost:8080/fhir/Patient \
+  -u registrar:password \
+  -H "Content-Type: application/fhir+json" \
+  -d '{
+    "resourceType": "Patient",
+    "name": [{"family": "Doe", "given": ["John"]}],
+    "gender": "male",
+    "birthDate": "1980-01-01"
+  }'
+```
+
+**Create a Vital Sign (Physician/Nurse)**
+```bash
+curl -X POST http://localhost:8080/fhir/Observation \
+  -u nurse:password \
+  -H "Content-Type: application/fhir+json" \
+  -d '{
+    "resourceType": "Observation",
+    "status": "final",
+    "code": {
+      "coding": [{"system": "http://loinc.org", "code": "8867-4", "display": "Heart rate"}]
+    },
+    "subject": {"reference": "Patient/123"},
+    "valueQuantity": {"value": 72, "unit": "beats/minute"}
+  }'
+```
+
 ### 1. Patient Scenarios (Role: **Admin**)
 | Method | Endpoint | Params | Description |
 | :--- | :--- | :--- | :--- |
@@ -267,6 +303,10 @@ Key environment variables in `application.yml`:
 | `SPRING_DATA_MONGODB_URI` | Mongo Connection String | `mongodb://localhost:27017/lifelog` |
 | `SPRING_REDIS_HOST` | Redis Server Host | `localhost` |
 | `SERVER_PORT` | Application HTTP Port | `8080` |
+| `SPRING_SECURITY_USERS_PHYSICIAN_PASSWORD` | Password for Physician Role | `password` |
+| `SPRING_SECURITY_USERS_NURSE_PASSWORD` | Password for Nurse Role | `password` |
+| `SPRING_SECURITY_USERS_REGISTRAR_PASSWORD` | Password for Registrar Role | `password` |
+| `SPRING_SECURITY_USERS_SYS_ADMIN_PASSWORD` | Password for SysAdmin Role | `password` |
 
 ### Observability
 *   **Metrics**: Prometheus scraper available at `/actuator/prometheus`.
@@ -312,10 +352,24 @@ src/main/java/com/al/lifelog/
 ```
 
 ### Adding a New Resource
-1.  **Model**: Create Class extending `DomainResource`. Application `Mongo{Resource}` wrapper.
-2.  **Repo**: Create `CodeRepository` interface.
-3.  **Service**: Implement CRUD logic, Caching, and Auditing calls.
-4.  **Provider**: Extend `IResourceProvider`, expose `@Create`, `@Read`, etc.
+1.  **Model**: Create a class in `model/` extending `DomainResource`. This wraps the FHIR resource for Mongo.
+    ```java
+    @Document(collection = "my_resource")
+    public class MongoMyResource extends MongoResource { ... }
+    ```
+2.  **Repo**: Create `CodeRepository` interface in `repository/`.
+    ```java
+    public interface MyResourceRepository extends MongoRepository<MongoMyResource, String> { ... }
+    ```
+3.  **Service**: Implement CRUD logic, Caching, and Auditing calls in `service/`.
+4.  **Provider**: Extend `IResourceProvider` in `provider/`.
+    ```java
+    @Component
+    public class MyResourceProvider implements IResourceProvider {
+       @Create
+       public MethodOutcome create(@ResourceParam MyResource resource) { ... }
+    }
+    ```
 5.  **Config**: Register Provider in `FhirRestfulServerConfig`.
 6.  **Security**: Define authorities in `SecurityConfig`.
 
